@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Office — Agent Dashboard</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    .header {
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+    }
+
+    .header h1 span { color: #38bdf8; }
+
+    .pipeline-status {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      color: #94a3b8;
+    }
+
+    .pipeline-status .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #475569;
+    }
+
+    .pipeline-status .dot.active {
+      background: #22c55e;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+      50% { opacity: 0.8; box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+    }
+
+    .office-floor {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1.5rem;
+      padding: 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .desk {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 1.5rem;
+      position: relative;
+      transition: all 0.3s ease;
+    }
+
+    .desk:hover {
+      border-color: #475569;
+      transform: translateY(-2px);
+    }
+
+    .desk.working {
+      border-color: #38bdf8;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.1);
+    }
+
+    .desk.success {
+      border-color: #22c55e;
+      box-shadow: 0 0 20px rgba(34, 197, 94, 0.1);
+    }
+
+    .desk.error {
+      border-color: #ef4444;
+      box-shadow: 0 0 20px rgba(239, 68, 68, 0.1);
+    }
+
+    .agent-avatar {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: #334155;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.8rem;
+      margin: 0 auto 1rem;
+      position: relative;
+    }
+
+    .desk.working .agent-avatar {
+      animation: bob 1s ease-in-out infinite;
+    }
+
+    @keyframes bob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+
+    .status-indicator {
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid #1e293b;
+      background: #475569;
+    }
+
+    .desk.working .status-indicator { background: #38bdf8; }
+    .desk.success .status-indicator { background: #22c55e; }
+    .desk.error .status-indicator { background: #ef4444; }
+    .desk.idle .status-indicator { background: #475569; }
+
+    .agent-name {
+      font-weight: 600;
+      text-align: center;
+      font-size: 1rem;
+      margin-bottom: 0.2rem;
+    }
+
+    .agent-title {
+      text-align: center;
+      font-size: 0.75rem;
+      color: #64748b;
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .speech-bubble {
+      background: #334155;
+      border-radius: 12px;
+      padding: 0.75rem 1rem;
+      font-size: 0.85rem;
+      line-height: 1.4;
+      position: relative;
+      min-height: 3rem;
+      color: #cbd5e1;
+    }
+
+    .speech-bubble::before {
+      content: '';
+      position: absolute;
+      top: -8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-bottom: 8px solid #334155;
+    }
+
+    .desk.working .speech-bubble {
+      background: #1e3a5f;
+    }
+
+    .desk.working .speech-bubble::before {
+      border-bottom-color: #1e3a5f;
+    }
+
+    .typing-indicator {
+      display: none;
+    }
+
+    .desk.working .typing-indicator {
+      display: inline;
+    }
+
+    .typing-indicator span {
+      display: inline-block;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: #38bdf8;
+      margin-left: 2px;
+      animation: typing 1.4s infinite;
+    }
+
+    .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes typing {
+      0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+      30% { opacity: 1; transform: translateY(-3px); }
+    }
+
+    .bottom-panel {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 2rem 2rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    .panel {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 1.5rem;
+    }
+
+    .panel h2 {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #64748b;
+      margin-bottom: 1rem;
+    }
+
+    .log-entry {
+      display: flex;
+      gap: 0.75rem;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #334155;
+      font-size: 0.8rem;
+    }
+
+    .log-entry:last-child { border-bottom: none; }
+
+    .log-time {
+      color: #475569;
+      font-family: monospace;
+      white-space: nowrap;
+    }
+
+    .log-agent {
+      color: #38bdf8;
+      font-weight: 500;
+      min-width: 60px;
+    }
+
+    .log-message {
+      color: #94a3b8;
+    }
+
+    .run-entry {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #334155;
+      font-size: 0.8rem;
+    }
+
+    .run-entry:last-child { border-bottom: none; }
+
+    .run-topic { color: #e2e8f0; }
+
+    .run-status {
+      padding: 0.15rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .run-status.published { background: #14532d; color: #4ade80; }
+    .run-status.review_failed { background: #7f1d1d; color: #fca5a5; }
+    .run-status.running { background: #1e3a5f; color: #38bdf8; }
+
+    .activity-log { max-height: 300px; overflow-y: auto; }
+
+    .empty-state {
+      color: #475569;
+      font-size: 0.85rem;
+      text-align: center;
+      padding: 2rem;
+    }
+
+    @media (max-width: 768px) {
+      .office-floor { grid-template-columns: repeat(2, 1fr); }
+      .bottom-panel { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🏢 <span>The Office</span> — Agent Dashboard</h1>
+  <div class="pipeline-status">
+    <div class="dot" id="pipeline-dot"></div>
+    <span id="pipeline-label">Pipeline idle</span>
+  </div>
+</div>
+
+<div class="office-floor" id="office-floor"></div>
+
+<div class="bottom-panel">
+  <div class="panel">
+    <h2>Activity Log</h2>
+    <div class="activity-log" id="activity-log">
+      <div class="empty-state">No activity yet — run the pipeline to see agents in action.</div>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>Pipeline Runs</h2>
+    <div id="runs-list">
+      <div class="empty-state">No completed runs yet.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const AGENTS_ORDER = ['seo_agent', 'writer_agent', 'editor_compliance_agent', 'publisher_agent'];
+
+function renderAgents(agents) {
+  const floor = document.getElementById('office-floor');
+  floor.innerHTML = '';
+
+  AGENTS_ORDER.forEach(key => {
+    const a = agents[key];
+    if (!a) return;
+
+    const desk = document.createElement('div');
+    desk.className = `desk ${a.status}`;
+    desk.innerHTML = `
+      <div class="agent-avatar">
+        ${a.emoji}
+        <div class="status-indicator"></div>
+      </div>
+      <div class="agent-name">${a.name}</div>
+      <div class="agent-title">${a.title}</div>
+      <div class="speech-bubble">
+        ${a.speech}
+        <span class="typing-indicator">
+          <span></span><span></span><span></span>
+        </span>
+      </div>
+    `;
+    floor.appendChild(desk);
+  });
+}
+
+function renderLog(log) {
+  const el = document.getElementById('activity-log');
+  if (!log || log.length === 0) {
+    el.innerHTML = '<div class="empty-state">No activity yet — run the pipeline to see agents in action.</div>';
+    return;
+  }
+  el.innerHTML = log.map(entry => `
+    <div class="log-entry">
+      <span class="log-time">${entry.time}</span>
+      <span class="log-agent">${entry.agent}</span>
+      <span class="log-message">${entry.message}</span>
+    </div>
+  `).join('');
+}
+
+function renderRuns(runs) {
+  const el = document.getElementById('runs-list');
+  if (!runs || runs.length === 0) {
+    el.innerHTML = '<div class="empty-state">No completed runs yet.</div>';
+    return;
+  }
+  el.innerHTML = runs.map(run => `
+    <div class="run-entry">
+      <span class="run-topic">${run.topic || 'Unknown'}</span>
+      <span class="run-status ${run.status || ''}">${run.status || 'unknown'}</span>
+    </div>
+  `).join('');
+}
+
+function updatePipelineStatus(state) {
+  const dot = document.getElementById('pipeline-dot');
+  const label = document.getElementById('pipeline-label');
+  if (state.pipeline_running) {
+    dot.classList.add('active');
+    label.textContent = `Working on: ${state.current_topic || '...'}`;
+  } else {
+    dot.classList.remove('active');
+    label.textContent = 'Pipeline idle';
+  }
+}
+
+async function poll() {
+  try {
+    const res = await fetch('/api/state');
+    const state = await res.json();
+    renderAgents(state.agents);
+    renderLog(state.activity_log);
+    renderRuns(state.runs);
+    updatePipelineStatus(state);
+  } catch (e) {
+    console.error('Poll failed:', e);
+  }
+}
+
+// Initial render from server-injected state
+const initialState = {{ state | tojson }};
+renderAgents(initialState.agents);
+renderLog(initialState.activity_log);
+renderRuns(initialState.runs);
+updatePipelineStatus(initialState);
+
+// Poll every 1.5 seconds
+setInterval(poll, 1500);
+</script>
+</body>
+</html>
