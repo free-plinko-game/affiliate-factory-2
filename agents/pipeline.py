@@ -74,11 +74,11 @@ def run_pipeline(topic: str, site_config: dict | None = None, publish: bool = Tr
             draft = writer_agent.run(brief, site_config, issues=all_feedback, previous_draft=draft)
             log_step(f"revision_{attempt}", {"length": len(draft)})
 
-    if not compliance_result["compliance_pass"]:
-        result["status"] = "compliance_failed"
+    if not compliance_result.get("compliance_pass") or not compliance_result.get("editorial_pass"):
+        result["status"] = "review_failed"
         result["finished_at"] = datetime.now(timezone.utc).isoformat()
-        logger.error("ESCALATION: Compliance failed after %d attempts — needs founder review", MAX_REVISIONS)
-        print("\n⚠ COMPLIANCE FAILED — requires founder review")
+        logger.error("ESCALATION: Review failed after %d attempts — needs founder review", MAX_REVISIONS)
+        print("\n⚠ REVIEW FAILED — requires founder review")
         print(json.dumps(compliance_result, indent=2))
         return result
 

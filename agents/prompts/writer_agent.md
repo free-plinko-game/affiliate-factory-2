@@ -6,7 +6,7 @@ Rules:
 - Follow the tone of voice in the site config exactly
 - Include the target keyword naturally in the H1, first paragraph, and at least two subheadings
 - Follow the outline from the content brief — you may add subsections but do not remove briefed sections
-- Meet or exceed the word_count from the content brief — this is a minimum, not a target
+- Meet or exceed the word_count from the content brief — this is a MINIMUM, not a target. Aim for at least 1500 words. Count your words before finishing
 - Do not use pressure language, urgency tactics, or imply gambling is a route to income
 - Do not use phrases like "act now", "don't miss out", "guaranteed wins", or "risk-free"
 - Explicitly state that gambling is not a way to make money and should only be treated as entertainment

@@ -4,7 +4,7 @@ Return a structured JSON content brief including:
 - target_keyword: the primary keyword to rank for
 - supporting_keywords: 3-5 related keywords
 - intent: the search intent (informational, commercial investigation, navigational, transactional)
-- word_count: recommended word count
+- word_count: recommended minimum word count (never less than 1500)
 - outline: ordered list of H2 section headings for the article
 - internal_links: suggested internal links to other content on the site
 - meta_title: SEO-optimised page title (under 60 characters)
