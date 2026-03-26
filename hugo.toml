@@ -1,0 +1,13 @@
+baseURL = 'http://68.183.44.120/'
+languageCode = 'en-GB'
+title = 'Site A'
+theme = 'affiliate-starter'
+
+[params]
+  description = 'Expert casino reviews and guides for UK players'
+  author = 'Editorial Team'
+
+[markup]
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = false

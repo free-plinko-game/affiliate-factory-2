@@ -1,0 +1,19 @@
+{
+  "site_slug": "site-a",
+  "domain": "68.183.44.120",
+  "repo": "github.com/free-plinko-game/affiliate-factory-2",
+  "market": "UK",
+  "jurisdiction": "UKGC",
+  "language": "en-GB",
+  "tone_of_voice": "Authoritative, clear, responsible. No hype. No pressure language.",
+  "target_audience": "UK adults 25-45, recreational gamblers",
+  "content_focus": ["casino reviews", "bonus comparisons", "responsible gambling"],
+  "affiliate_programs": [],
+  "compliance_framework": [
+    "ASA CAP Code 16/17",
+    "UKGC licence condition 7",
+    "BeGambleAware messaging required"
+  ],
+  "hugo_theme": "affiliate-starter",
+  "deploy_branch": "main"
+}
