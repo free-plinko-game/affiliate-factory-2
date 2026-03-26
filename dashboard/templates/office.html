@@ -195,41 +195,71 @@
 
     /* Chat */
     .chat-box {
-      max-height: 200px; overflow-y: auto;
-      margin-bottom: 0.5rem;
+      max-height: 280px; overflow-y: auto;
+      margin-bottom: 0.75rem;
+      padding: 0.5rem;
+      background: #0f172a;
+      border-radius: 10px;
+      border: 1px solid #1e293b;
     }
+    .chat-welcome {
+      color: #475569; font-size: 0.8rem;
+      text-align: center; padding: 2rem 1rem;
+      font-style: italic;
+    }
+    .chat-loading { color: #475569; font-size: 0.8rem; text-align: center; padding: 1rem; }
     .chat-msg {
-      padding: 0.5rem 0.75rem; border-radius: 10px;
-      margin-bottom: 0.4rem; font-size: 0.8rem; line-height: 1.4;
-      max-width: 85%;
+      padding: 0.5rem 0.75rem; border-radius: 12px;
+      margin-bottom: 0.4rem; font-size: 0.82rem; line-height: 1.5;
+      max-width: 85%; position: relative;
+      animation: msgIn 0.2s ease;
+    }
+    @keyframes msgIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
     }
     .chat-msg.user {
-      background: #1e3a5f; color: #7dd3fc;
-      margin-left: auto; text-align: right;
+      background: #1e3a5f; color: #bae6fd;
+      margin-left: auto; border-bottom-right-radius: 4px;
     }
     .chat-msg.agent {
-      background: #334155; color: #cbd5e1;
+      background: #334155; color: #e2e8f0;
+      border-bottom-left-radius: 4px;
+    }
+    .chat-msg.typing {
+      background: #334155; padding: 0.75rem;
+    }
+    .chat-msg-time {
+      display: block; font-size: 0.6rem; color: #475569;
+      margin-bottom: 0.15rem;
     }
     .chat-msg .kb-badge {
       display: inline-block; font-size: 0.6rem;
       background: #14532d; color: #4ade80;
       padding: 0.1rem 0.4rem; border-radius: 9999px;
-      margin-top: 0.25rem;
+      margin-top: 0.3rem;
     }
+    .typing-dots span {
+      display: inline-block; width: 6px; height: 6px;
+      border-radius: 50%; background: #64748b; margin-right: 3px;
+      animation: typing 1.4s infinite;
+    }
+    .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
     .chat-form {
       display: flex; gap: 0.5rem;
     }
     .chat-input {
       flex: 1; background: #0f172a; border: 1px solid #334155;
-      border-radius: 8px; color: #e2e8f0; padding: 0.5rem 0.75rem;
-      font-family: inherit; font-size: 0.8rem;
+      border-radius: 20px; color: #e2e8f0; padding: 0.6rem 1rem;
+      font-family: inherit; font-size: 0.82rem;
     }
     .chat-input:focus { outline: none; border-color: #38bdf8; }
     .chat-input::placeholder { color: #475569; }
     .chat-send {
       background: #38bdf8; color: #0f172a; border: none;
-      border-radius: 8px; padding: 0.5rem 1rem;
-      font-weight: 600; font-size: 0.8rem; cursor: pointer;
+      border-radius: 20px; padding: 0.6rem 1.25rem;
+      font-weight: 600; font-size: 0.82rem; cursor: pointer;
     }
     .chat-send:hover { background: #7dd3fc; }
     .chat-send:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
@@ -375,10 +405,10 @@ function openModal(agentKey, agents) {
       <div class="modal-speech">${a.speech}</div>
     </div>
     <div class="modal-section">
-      <h3>Talk to ${a.name}</h3>
-      <div class="chat-box" id="chat-box-${agentKey}"></div>
+      <h3>Chat with ${a.name}</h3>
+      <div class="chat-box" id="chat-box-${agentKey}"><div class="chat-loading">Loading...</div></div>
       <form class="chat-form" onsubmit="return sendChat(event, '${agentKey}')">
-        <input type="text" class="chat-input" id="chat-input-${agentKey}" placeholder="Give ${a.name} feedback... e.g. 'be more flexible on word count'" autocomplete="off">
+        <input type="text" class="chat-input" id="chat-input-${agentKey}" placeholder="Message ${a.name}..." autocomplete="off">
         <button type="submit" class="chat-send">Send</button>
       </form>
     </div>
@@ -396,6 +426,11 @@ function openModal(agentKey, agents) {
     </div>
   `;
   document.getElementById('modal-overlay').classList.add('open');
+  loadChatHistory(agentKey);
+  setTimeout(() => {
+    const input = document.getElementById(`chat-input-${agentKey}`);
+    if (input) input.focus();
+  }, 100);
 }
 
 function closeModal(e) {
@@ -475,21 +510,53 @@ async function poll() {
   } catch (e) {}
 }
 
+async function loadChatHistory(agentKey) {
+  const box = document.getElementById(`chat-box-${agentKey}`);
+  if (!box) return;
+  try {
+    const res = await fetch(`/api/chat/history/${agentKey}`);
+    const history = await res.json();
+    box.innerHTML = '';
+    if (history.length === 0) {
+      const name = currentState.agents[agentKey]?.name || 'this agent';
+      box.innerHTML = `<div class="chat-welcome">Start a conversation with ${name} — give feedback, ask questions, or just chat.</div>`;
+    } else {
+      history.forEach(h => {
+        const cls = h.role === 'user' ? 'user' : 'agent';
+        let html = `<div class="chat-msg ${cls}"><span class="chat-msg-time">${h.time || ''}</span>${h.content}`;
+        if (h.kb_updated) html += `<br><span class="kb-badge">Remembered</span>`;
+        html += `</div>`;
+        box.innerHTML += html;
+      });
+    }
+    box.scrollTop = box.scrollHeight;
+  } catch (e) {
+    box.innerHTML = '<div class="chat-welcome">Chat unavailable.</div>';
+  }
+}
+
 async function sendChat(e, agentKey) {
   e.preventDefault();
   const input = document.getElementById(`chat-input-${agentKey}`);
   const box = document.getElementById(`chat-box-${agentKey}`);
+  const btn = e.target.querySelector('.chat-send');
   const msg = input.value.trim();
   if (!msg) return false;
 
-  // Show user message
-  box.innerHTML += `<div class="chat-msg user">${msg}</div>`;
+  // Remove welcome message if present
+  const welcome = box.querySelector('.chat-welcome');
+  if (welcome) welcome.remove();
+
+  box.innerHTML += `<div class="chat-msg user"><span class="chat-msg-time">now</span>${msg}</div>`;
   input.value = '';
   input.disabled = true;
+  btn.disabled = true;
+  btn.textContent = '...';
   box.scrollTop = box.scrollHeight;
 
-  // Show typing indicator
-  box.innerHTML += `<div class="chat-msg agent" id="chat-typing">Thinking...</div>`;
+  // Typing indicator
+  const typingId = 'typing-' + Date.now();
+  box.innerHTML += `<div class="chat-msg agent typing" id="${typingId}"><span class="typing-dots"><span></span><span></span><span></span></span></div>`;
   box.scrollTop = box.scrollHeight;
 
   try {
@@ -499,27 +566,24 @@ async function sendChat(e, agentKey) {
       body: JSON.stringify({ agent: agentKey, message: msg })
     });
     const data = await res.json();
-    // Remove typing indicator
-    const typing = document.getElementById('chat-typing');
-    if (typing) typing.remove();
+    document.getElementById(typingId)?.remove();
 
     if (data.error) {
-      box.innerHTML += `<div class="chat-msg agent">Sorry, something went wrong: ${data.error}</div>`;
+      box.innerHTML += `<div class="chat-msg agent">Something went wrong: ${data.error}</div>`;
     } else {
-      let reply = `<div class="chat-msg agent">${data.reply}`;
-      if (data.knowledge_updated) {
-        reply += `<br><span class="kb-badge">Knowledge base updated</span>`;
-      }
-      reply += `</div>`;
-      box.innerHTML += reply;
+      let html = `<div class="chat-msg agent"><span class="chat-msg-time">now</span>${data.reply}`;
+      if (data.knowledge_updated) html += `<br><span class="kb-badge">Remembered</span>`;
+      html += `</div>`;
+      box.innerHTML += html;
     }
   } catch (err) {
-    const typing = document.getElementById('chat-typing');
-    if (typing) typing.remove();
-    box.innerHTML += `<div class="chat-msg agent">Connection error — is the server running?</div>`;
+    document.getElementById(typingId)?.remove();
+    box.innerHTML += `<div class="chat-msg agent">Connection error.</div>`;
   }
 
   input.disabled = false;
+  btn.disabled = false;
+  btn.textContent = 'Send';
   input.focus();
   box.scrollTop = box.scrollHeight;
   return false;

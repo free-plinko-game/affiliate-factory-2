@@ -195,7 +195,6 @@ def api_chat():
         return jsonify({"error": "agent and message required"}), 400
 
     try:
-        # Need OpenAI key
         import os
         if not os.environ.get("OPENAI_API_KEY"):
             return jsonify({"error": "OPENAI_API_KEY not set on server"}), 500
@@ -205,6 +204,16 @@ def api_chat():
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/chat/history/<agent_key>")
+def api_chat_history(agent_key):
+    """Get chat history for an agent."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent / "agents"))
+    import chat_handler
+    history = chat_handler.get_history(agent_key)
+    return jsonify(history)
 
 
 @app.route("/api/knowledge/<agent_key>")
