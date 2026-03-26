@@ -1,4 +1,4 @@
-baseURL = 'http://68.183.44.120/'
+baseURL = 'http://68.183.44.120:3284/'
 languageCode = 'en-GB'
 title = 'Site A'
 theme = 'affiliate-starter'
