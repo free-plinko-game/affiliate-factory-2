@@ -6,16 +6,13 @@
   <title>The Office — Agent Dashboard</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
     * { margin: 0; padding: 0; box-sizing: border-box; }
-
     body {
       font-family: 'Inter', sans-serif;
       background: #0f172a;
       color: #e2e8f0;
       min-height: 100vh;
     }
-
     .header {
       background: #1e293b;
       border-bottom: 1px solid #334155;
@@ -24,277 +21,265 @@
       justify-content: space-between;
       align-items: center;
     }
-
-    .header h1 {
-      font-size: 1.4rem;
-      font-weight: 700;
-    }
-
+    .header h1 { font-size: 1.4rem; font-weight: 700; }
     .header h1 span { color: #38bdf8; }
-
     .pipeline-status {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.85rem;
-      color: #94a3b8;
+      display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.85rem; color: #94a3b8;
     }
-
-    .pipeline-status .dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #475569;
-    }
-
-    .pipeline-status .dot.active {
-      background: #22c55e;
-      animation: pulse 1.5s infinite;
-    }
-
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: #475569; }
+    .dot.active { background: #22c55e; animation: pulse 1.5s infinite; }
     @keyframes pulse {
-      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
-      50% { opacity: 0.8; box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34,197,94,0.4); }
+      50% { opacity: 0.8; box-shadow: 0 0 0 8px rgba(34,197,94,0); }
     }
+
+    .brief-bar { max-width: 1400px; margin: 1.5rem auto 0; padding: 0 2rem; }
+    .brief-form {
+      display: flex; gap: 0.75rem;
+      background: #1e293b; border: 1px solid #334155;
+      border-radius: 12px; padding: 1rem;
+    }
+    .brief-form textarea {
+      flex: 1; background: #0f172a; border: 1px solid #334155;
+      border-radius: 8px; color: #e2e8f0; padding: 0.75rem;
+      font-family: inherit; font-size: 0.9rem; resize: none;
+      height: 44px; line-height: 1.4;
+    }
+    .brief-form textarea:focus { outline: none; border-color: #38bdf8; }
+    .brief-form textarea::placeholder { color: #475569; }
+    .brief-form button {
+      background: #38bdf8; color: #0f172a; border: none;
+      border-radius: 8px; padding: 0 1.5rem;
+      font-weight: 600; font-size: 0.85rem; cursor: pointer; white-space: nowrap;
+    }
+    .brief-form button:hover { background: #7dd3fc; }
+    .brief-form button:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
 
     .office-floor {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 1.5rem;
-      padding: 2rem;
-      max-width: 1200px;
-      margin: 0 auto;
+      grid-template-columns: repeat(6, 1fr);
+      grid-template-rows: auto auto;
+      gap: 1rem; padding: 1.5rem 2rem;
+      max-width: 1400px; margin: 0 auto;
     }
-
+    .desk[data-agent="sub_editor_agent"] {
+      grid-column: 4;
+      grid-row: 2;
+    }
     .desk {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 16px;
-      padding: 1.5rem;
-      position: relative;
-      transition: all 0.3s ease;
+      background: #1e293b; border: 1px solid #334155;
+      border-radius: 16px; padding: 1.25rem;
+      transition: all 0.3s ease; cursor: pointer;
     }
-
-    .desk:hover {
-      border-color: #475569;
-      transform: translateY(-2px);
-    }
-
-    .desk.working {
-      border-color: #38bdf8;
-      box-shadow: 0 0 20px rgba(56, 189, 248, 0.1);
-    }
-
-    .desk.success {
-      border-color: #22c55e;
-      box-shadow: 0 0 20px rgba(34, 197, 94, 0.1);
-    }
-
-    .desk.error {
-      border-color: #ef4444;
-      box-shadow: 0 0 20px rgba(239, 68, 68, 0.1);
-    }
-
+    .desk:hover { border-color: #475569; transform: translateY(-2px); }
+    .desk.working { border-color: #38bdf8; box-shadow: 0 0 20px rgba(56,189,248,0.1); }
+    .desk.success { border-color: #22c55e; box-shadow: 0 0 20px rgba(34,197,94,0.1); }
+    .desk.error { border-color: #ef4444; box-shadow: 0 0 20px rgba(239,68,68,0.1); }
     .agent-avatar {
-      width: 64px;
-      height: 64px;
-      border-radius: 50%;
-      background: #334155;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.8rem;
-      margin: 0 auto 1rem;
-      position: relative;
+      width: 56px; height: 56px; border-radius: 50%;
+      background: #334155; display: flex; align-items: center;
+      justify-content: center; font-size: 1.6rem;
+      margin: 0 auto 0.75rem; position: relative;
     }
-
-    .desk.working .agent-avatar {
-      animation: bob 1s ease-in-out infinite;
-    }
-
-    @keyframes bob {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-4px); }
-    }
-
+    .desk.working .agent-avatar { animation: bob 1s ease-in-out infinite; }
+    @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
     .status-indicator {
-      position: absolute;
-      bottom: 2px;
-      right: 2px;
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      border: 2px solid #1e293b;
-      background: #475569;
+      position: absolute; bottom: 2px; right: 2px;
+      width: 12px; height: 12px; border-radius: 50%;
+      border: 2px solid #1e293b; background: #475569;
     }
-
     .desk.working .status-indicator { background: #38bdf8; }
     .desk.success .status-indicator { background: #22c55e; }
     .desk.error .status-indicator { background: #ef4444; }
-    .desk.idle .status-indicator { background: #475569; }
-
-    .agent-name {
-      font-weight: 600;
-      text-align: center;
-      font-size: 1rem;
-      margin-bottom: 0.2rem;
-    }
-
+    .agent-name { font-weight: 600; text-align: center; font-size: 0.9rem; margin-bottom: 0.15rem; }
     .agent-title {
-      text-align: center;
-      font-size: 0.75rem;
-      color: #64748b;
-      margin-bottom: 1rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
+      text-align: center; font-size: 0.65rem; color: #64748b;
+      text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem;
     }
-
     .speech-bubble {
-      background: #334155;
-      border-radius: 12px;
-      padding: 0.75rem 1rem;
-      font-size: 0.85rem;
-      line-height: 1.4;
-      position: relative;
-      min-height: 3rem;
-      color: #cbd5e1;
+      background: #334155; border-radius: 10px;
+      padding: 0.6rem 0.75rem; font-size: 0.78rem;
+      line-height: 1.4; position: relative;
+      min-height: 2.5rem; color: #cbd5e1;
     }
-
     .speech-bubble::before {
-      content: '';
-      position: absolute;
-      top: -8px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 0;
-      height: 0;
-      border-left: 8px solid transparent;
-      border-right: 8px solid transparent;
-      border-bottom: 8px solid #334155;
+      content: ''; position: absolute; top: -7px; left: 50%; transform: translateX(-50%);
+      border-left: 7px solid transparent; border-right: 7px solid transparent;
+      border-bottom: 7px solid #334155;
     }
-
-    .desk.working .speech-bubble {
-      background: #1e3a5f;
+    .desk.working .speech-bubble { background: #1e3a5f; }
+    .desk.working .speech-bubble::before { border-bottom-color: #1e3a5f; }
+    .click-hint {
+      text-align: center; font-size: 0.6rem; color: #475569;
+      margin-top: 0.5rem; opacity: 0;
+      transition: opacity 0.2s;
     }
-
-    .desk.working .speech-bubble::before {
-      border-bottom-color: #1e3a5f;
-    }
-
-    .typing-indicator {
-      display: none;
-    }
-
-    .desk.working .typing-indicator {
-      display: inline;
-    }
-
+    .desk:hover .click-hint { opacity: 1; }
+    .typing-indicator { display: none; }
+    .desk.working .typing-indicator { display: inline; }
     .typing-indicator span {
-      display: inline-block;
-      width: 4px;
-      height: 4px;
-      border-radius: 50%;
-      background: #38bdf8;
-      margin-left: 2px;
+      display: inline-block; width: 4px; height: 4px;
+      border-radius: 50%; background: #38bdf8; margin-left: 2px;
       animation: typing 1.4s infinite;
     }
-
     .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
     .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
-
     @keyframes typing {
       0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
       30% { opacity: 1; transform: translateY(-3px); }
     }
 
+    /* Modal */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7); z-index: 100;
+      justify-content: center; align-items: center;
+      backdrop-filter: blur(4px);
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #1e293b; border: 1px solid #334155;
+      border-radius: 20px; padding: 2rem;
+      max-width: 500px; width: 90%; max-height: 80vh;
+      overflow-y: auto; position: relative;
+    }
+    .modal-close {
+      position: absolute; top: 1rem; right: 1rem;
+      background: #334155; border: none; color: #94a3b8;
+      width: 32px; height: 32px; border-radius: 50%;
+      cursor: pointer; font-size: 1.1rem;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .modal-close:hover { background: #475569; color: #e2e8f0; }
+    .modal-header {
+      display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem;
+    }
+    .modal-avatar {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: #334155; display: flex; align-items: center;
+      justify-content: center; font-size: 1.4rem;
+    }
+    .modal-name { font-weight: 700; font-size: 1.1rem; }
+    .modal-title { font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+    .modal-status {
+      display: inline-block; padding: 0.15rem 0.5rem;
+      border-radius: 9999px; font-size: 0.65rem;
+      font-weight: 600; text-transform: uppercase; margin-top: 0.25rem;
+    }
+    .modal-status.working { background: #1e3a5f; color: #38bdf8; }
+    .modal-status.success { background: #14532d; color: #4ade80; }
+    .modal-status.error { background: #7f1d1d; color: #fca5a5; }
+    .modal-status.idle { background: #334155; color: #64748b; }
+    .modal-section { margin-bottom: 1.25rem; }
+    .modal-section h3 {
+      font-size: 0.7rem; text-transform: uppercase;
+      letter-spacing: 0.05em; color: #64748b; margin-bottom: 0.5rem;
+    }
+    .modal-speech {
+      background: #334155; border-radius: 10px;
+      padding: 0.75rem 1rem; font-size: 0.85rem;
+      line-height: 1.5; color: #cbd5e1;
+    }
+    .thought-entry {
+      background: #0f172a; border-radius: 8px;
+      padding: 0.6rem 0.75rem; margin-bottom: 0.5rem;
+      font-size: 0.8rem; line-height: 1.5; color: #94a3b8;
+      border-left: 3px solid #334155; white-space: pre-wrap;
+    }
+    .thought-entry .thought-time {
+      font-size: 0.65rem; color: #475569;
+      font-family: monospace; display: block; margin-bottom: 0.25rem;
+    }
+    .thought-entry.latest { border-left-color: #38bdf8; color: #cbd5e1; }
+
+    /* Chat */
+    .chat-box {
+      max-height: 200px; overflow-y: auto;
+      margin-bottom: 0.5rem;
+    }
+    .chat-msg {
+      padding: 0.5rem 0.75rem; border-radius: 10px;
+      margin-bottom: 0.4rem; font-size: 0.8rem; line-height: 1.4;
+      max-width: 85%;
+    }
+    .chat-msg.user {
+      background: #1e3a5f; color: #7dd3fc;
+      margin-left: auto; text-align: right;
+    }
+    .chat-msg.agent {
+      background: #334155; color: #cbd5e1;
+    }
+    .chat-msg .kb-badge {
+      display: inline-block; font-size: 0.6rem;
+      background: #14532d; color: #4ade80;
+      padding: 0.1rem 0.4rem; border-radius: 9999px;
+      margin-top: 0.25rem;
+    }
+    .chat-form {
+      display: flex; gap: 0.5rem;
+    }
+    .chat-input {
+      flex: 1; background: #0f172a; border: 1px solid #334155;
+      border-radius: 8px; color: #e2e8f0; padding: 0.5rem 0.75rem;
+      font-family: inherit; font-size: 0.8rem;
+    }
+    .chat-input:focus { outline: none; border-color: #38bdf8; }
+    .chat-input::placeholder { color: #475569; }
+    .chat-send {
+      background: #38bdf8; color: #0f172a; border: none;
+      border-radius: 8px; padding: 0.5rem 1rem;
+      font-weight: 600; font-size: 0.8rem; cursor: pointer;
+    }
+    .chat-send:hover { background: #7dd3fc; }
+    .chat-send:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
+
+    /* Bottom panels */
     .bottom-panel {
-      max-width: 1200px;
-      margin: 0 auto;
+      max-width: 1400px; margin: 0 auto;
       padding: 0 2rem 2rem;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.5rem;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;
     }
-
     .panel {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 16px;
-      padding: 1.5rem;
+      background: #1e293b; border: 1px solid #334155;
+      border-radius: 16px; padding: 1.25rem;
     }
-
     .panel h2 {
-      font-size: 0.85rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: #64748b;
-      margin-bottom: 1rem;
+      font-size: 0.8rem; text-transform: uppercase;
+      letter-spacing: 0.05em; color: #64748b; margin-bottom: 0.75rem;
     }
-
     .log-entry {
-      display: flex;
-      gap: 0.75rem;
-      padding: 0.5rem 0;
-      border-bottom: 1px solid #334155;
-      font-size: 0.8rem;
+      display: flex; gap: 0.6rem; padding: 0.4rem 0;
+      border-bottom: 1px solid #1e293b; font-size: 0.75rem;
     }
-
     .log-entry:last-child { border-bottom: none; }
-
-    .log-time {
-      color: #475569;
-      font-family: monospace;
-      white-space: nowrap;
-    }
-
-    .log-agent {
-      color: #38bdf8;
-      font-weight: 500;
-      min-width: 60px;
-    }
-
-    .log-message {
-      color: #94a3b8;
-    }
-
+    .log-time { color: #475569; font-family: monospace; white-space: nowrap; }
+    .log-agent { color: #38bdf8; font-weight: 500; min-width: 50px; }
+    .log-message { color: #94a3b8; }
     .run-entry {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.5rem 0;
-      border-bottom: 1px solid #334155;
-      font-size: 0.8rem;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0.5rem 0; border-bottom: 1px solid #1e293b; font-size: 0.78rem;
     }
-
     .run-entry:last-child { border-bottom: none; }
-
-    .run-topic { color: #e2e8f0; }
-
+    .run-topic { color: #e2e8f0; flex: 1; }
+    .run-jobs { color: #64748b; margin: 0 0.75rem; font-size: 0.7rem; }
     .run-status {
-      padding: 0.15rem 0.5rem;
-      border-radius: 9999px;
-      font-size: 0.7rem;
-      font-weight: 600;
-      text-transform: uppercase;
+      padding: 0.15rem 0.5rem; border-radius: 9999px;
+      font-size: 0.65rem; font-weight: 600; text-transform: uppercase;
     }
-
+    .run-status.completed { background: #14532d; color: #4ade80; }
     .run-status.published { background: #14532d; color: #4ade80; }
-    .run-status.review_failed { background: #7f1d1d; color: #fca5a5; }
+    .run-status.partial { background: #713f12; color: #fbbf24; }
+    .run-status.failed, .run-status.review_failed { background: #7f1d1d; color: #fca5a5; }
     .run-status.running { background: #1e3a5f; color: #38bdf8; }
-
     .activity-log { max-height: 300px; overflow-y: auto; }
+    .empty-state { color: #475569; font-size: 0.85rem; text-align: center; padding: 2rem; }
 
-    .empty-state {
-      color: #475569;
-      font-size: 0.85rem;
-      text-align: center;
-      padding: 2rem;
-    }
-
-    @media (max-width: 768px) {
-      .office-floor { grid-template-columns: repeat(2, 1fr); }
+    @media (max-width: 900px) {
+      .office-floor { grid-template-columns: repeat(3, 1fr); }
       .bottom-panel { grid-template-columns: 1fr; }
     }
+    @media (max-width: 600px) { .office-floor { grid-template-columns: repeat(2, 1fr); } }
   </style>
 </head>
 <body>
@@ -307,13 +292,28 @@
   </div>
 </div>
 
+<div class="brief-bar">
+  <form class="brief-form" id="brief-form" onsubmit="return submitBrief(event)">
+    <textarea id="brief-input" placeholder="Give the team a brief... e.g. 'Write 3 articles about UK casino bonuses, responsible gambling, and how slots work'" rows="1"></textarea>
+    <button type="submit" id="brief-btn">Send Brief</button>
+  </form>
+</div>
+
 <div class="office-floor" id="office-floor"></div>
+
+<!-- Agent detail modal -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal" id="modal" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="document.getElementById('modal-overlay').classList.remove('open')">&times;</button>
+    <div id="modal-content"></div>
+  </div>
+</div>
 
 <div class="bottom-panel">
   <div class="panel">
     <h2>Activity Log</h2>
     <div class="activity-log" id="activity-log">
-      <div class="empty-state">No activity yet — run the pipeline to see agents in action.</div>
+      <div class="empty-state">No activity yet — send a brief to get the office moving.</div>
     </div>
   </div>
   <div class="panel">
@@ -325,18 +325,20 @@
 </div>
 
 <script>
-const AGENTS_ORDER = ['seo_agent', 'writer_agent', 'editor_compliance_agent', 'publisher_agent'];
+const AGENTS_ORDER = ['manager_agent', 'seo_agent', 'writer_agent', 'editor_agent', 'compliance_agent', 'publisher_agent', 'sub_editor_agent'];
+let currentState = {};
 
 function renderAgents(agents) {
   const floor = document.getElementById('office-floor');
   floor.innerHTML = '';
-
   AGENTS_ORDER.forEach(key => {
     const a = agents[key];
     if (!a) return;
-
+    const thoughtCount = (a.thoughts || []).length;
     const desk = document.createElement('div');
     desk.className = `desk ${a.status}`;
+    desk.dataset.agent = key;
+    desk.onclick = () => openModal(key, agents);
     desk.innerHTML = `
       <div class="agent-avatar">
         ${a.emoji}
@@ -346,40 +348,93 @@ function renderAgents(agents) {
       <div class="agent-title">${a.title}</div>
       <div class="speech-bubble">
         ${a.speech}
-        <span class="typing-indicator">
-          <span></span><span></span><span></span>
-        </span>
+        <span class="typing-indicator"><span></span><span></span><span></span></span>
       </div>
+      <div class="click-hint">${thoughtCount ? `Click — ${thoughtCount} thought${thoughtCount > 1 ? 's' : ''}` : 'Click to view'}</div>
     `;
     floor.appendChild(desk);
   });
 }
 
+function openModal(agentKey, agents) {
+  const a = agents[agentKey];
+  if (!a) return;
+  const thoughts = a.thoughts || [];
+  const mc = document.getElementById('modal-content');
+  mc.innerHTML = `
+    <div class="modal-header">
+      <div class="modal-avatar">${a.emoji}</div>
+      <div>
+        <div class="modal-name">${a.name}</div>
+        <div class="modal-title">${a.title}</div>
+        <div class="modal-status ${a.status}">${a.status}</div>
+      </div>
+    </div>
+    <div class="modal-section">
+      <h3>Currently saying</h3>
+      <div class="modal-speech">${a.speech}</div>
+    </div>
+    <div class="modal-section">
+      <h3>Talk to ${a.name}</h3>
+      <div class="chat-box" id="chat-box-${agentKey}"></div>
+      <form class="chat-form" onsubmit="return sendChat(event, '${agentKey}')">
+        <input type="text" class="chat-input" id="chat-input-${agentKey}" placeholder="Give ${a.name} feedback... e.g. 'be more flexible on word count'" autocomplete="off">
+        <button type="submit" class="chat-send">Send</button>
+      </form>
+    </div>
+    <div class="modal-section">
+      <h3>Thought process ${thoughts.length ? `(${thoughts.length})` : ''}</h3>
+      ${thoughts.length
+        ? thoughts.map((t, i) => `
+          <div class="thought-entry ${i === 0 ? 'latest' : ''}">
+            <span class="thought-time">${t.time}</span>
+            ${t.text}
+          </div>
+        `).join('')
+        : '<div class="empty-state" style="padding:1rem">No thoughts yet — waiting for work.</div>'
+      }
+    </div>
+  `;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById('modal-overlay')) {
+    document.getElementById('modal-overlay').classList.remove('open');
+  }
+}
+
+// Close on Escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.getElementById('modal-overlay').classList.remove('open');
+});
+
 function renderLog(log) {
   const el = document.getElementById('activity-log');
-  if (!log || log.length === 0) {
-    el.innerHTML = '<div class="empty-state">No activity yet — run the pipeline to see agents in action.</div>';
+  if (!log || !log.length) {
+    el.innerHTML = '<div class="empty-state">No activity yet — send a brief to get the office moving.</div>';
     return;
   }
-  el.innerHTML = log.map(entry => `
+  el.innerHTML = log.map(e => `
     <div class="log-entry">
-      <span class="log-time">${entry.time}</span>
-      <span class="log-agent">${entry.agent}</span>
-      <span class="log-message">${entry.message}</span>
+      <span class="log-time">${e.time}</span>
+      <span class="log-agent">${e.agent}</span>
+      <span class="log-message">${e.message}</span>
     </div>
   `).join('');
 }
 
 function renderRuns(runs) {
   const el = document.getElementById('runs-list');
-  if (!runs || runs.length === 0) {
+  if (!runs || !runs.length) {
     el.innerHTML = '<div class="empty-state">No completed runs yet.</div>';
     return;
   }
-  el.innerHTML = runs.map(run => `
+  el.innerHTML = runs.map(r => `
     <div class="run-entry">
-      <span class="run-topic">${run.topic || 'Unknown'}</span>
-      <span class="run-status ${run.status || ''}">${run.status || 'unknown'}</span>
+      <span class="run-topic">${r.topic || 'Unknown'}</span>
+      ${r.jobs ? `<span class="run-jobs">${r.jobs} job(s)</span>` : ''}
+      <span class="run-status ${r.status || ''}">${r.status || '?'}</span>
     </div>
   `).join('');
 }
@@ -387,36 +442,113 @@ function renderRuns(runs) {
 function updatePipelineStatus(state) {
   const dot = document.getElementById('pipeline-dot');
   const label = document.getElementById('pipeline-label');
+  const btn = document.getElementById('brief-btn');
   if (state.pipeline_running) {
     dot.classList.add('active');
     label.textContent = `Working on: ${state.current_topic || '...'}`;
+    btn.disabled = true; btn.textContent = 'Running...';
   } else {
     dot.classList.remove('active');
     label.textContent = 'Pipeline idle';
+    btn.disabled = false; btn.textContent = 'Send Brief';
   }
 }
 
 async function poll() {
   try {
     const res = await fetch('/api/state');
-    const state = await res.json();
-    renderAgents(state.agents);
-    renderLog(state.activity_log);
-    renderRuns(state.runs);
-    updatePipelineStatus(state);
-  } catch (e) {
-    console.error('Poll failed:', e);
-  }
+    currentState = await res.json();
+    renderAgents(currentState.agents);
+    renderLog(currentState.activity_log);
+    renderRuns(currentState.runs);
+    updatePipelineStatus(currentState);
+    // Auto-refresh modal if open
+    const overlay = document.getElementById('modal-overlay');
+    if (overlay.classList.contains('open')) {
+      const mc = document.getElementById('modal-content');
+      const nameEl = mc.querySelector('.modal-name');
+      if (nameEl) {
+        const openAgent = AGENTS_ORDER.find(k => currentState.agents[k]?.name === nameEl.textContent);
+        if (openAgent) openModal(openAgent, currentState.agents);
+      }
+    }
+  } catch (e) {}
 }
 
-// Initial render from server-injected state
-const initialState = {{ state | tojson }};
-renderAgents(initialState.agents);
-renderLog(initialState.activity_log);
-renderRuns(initialState.runs);
-updatePipelineStatus(initialState);
+async function sendChat(e, agentKey) {
+  e.preventDefault();
+  const input = document.getElementById(`chat-input-${agentKey}`);
+  const box = document.getElementById(`chat-box-${agentKey}`);
+  const msg = input.value.trim();
+  if (!msg) return false;
 
-// Poll every 1.5 seconds
+  // Show user message
+  box.innerHTML += `<div class="chat-msg user">${msg}</div>`;
+  input.value = '';
+  input.disabled = true;
+  box.scrollTop = box.scrollHeight;
+
+  // Show typing indicator
+  box.innerHTML += `<div class="chat-msg agent" id="chat-typing">Thinking...</div>`;
+  box.scrollTop = box.scrollHeight;
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ agent: agentKey, message: msg })
+    });
+    const data = await res.json();
+    // Remove typing indicator
+    const typing = document.getElementById('chat-typing');
+    if (typing) typing.remove();
+
+    if (data.error) {
+      box.innerHTML += `<div class="chat-msg agent">Sorry, something went wrong: ${data.error}</div>`;
+    } else {
+      let reply = `<div class="chat-msg agent">${data.reply}`;
+      if (data.knowledge_updated) {
+        reply += `<br><span class="kb-badge">Knowledge base updated</span>`;
+      }
+      reply += `</div>`;
+      box.innerHTML += reply;
+    }
+  } catch (err) {
+    const typing = document.getElementById('chat-typing');
+    if (typing) typing.remove();
+    box.innerHTML += `<div class="chat-msg agent">Connection error — is the server running?</div>`;
+  }
+
+  input.disabled = false;
+  input.focus();
+  box.scrollTop = box.scrollHeight;
+  return false;
+}
+
+function submitBrief(e) {
+  e.preventDefault();
+  const input = document.getElementById('brief-input');
+  const brief = input.value.trim();
+  if (!brief) return false;
+  fetch('/api/update', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      pipeline_running: true, current_topic: brief,
+      agent: 'manager_agent', status: 'working',
+      speech: 'New brief received! Reading...',
+      log: 'Brief submitted: ' + brief,
+    })
+  });
+  input.value = '';
+  return false;
+}
+
+currentState = {{ state | tojson }};
+renderAgents(currentState.agents);
+renderLog(currentState.activity_log);
+renderRuns(currentState.runs);
+updatePipelineStatus(currentState);
 setInterval(poll, 1500);
 </script>
 </body>

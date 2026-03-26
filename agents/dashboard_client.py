@@ -11,13 +11,6 @@ logger = logging.getLogger(__name__)
 
 DASHBOARD_URL = os.environ.get("DASHBOARD_URL", "http://68.183.44.120:5050")
 
-IDLE_SPEECH = {
-    "seo_agent": "Waiting for a keyword to research...",
-    "writer_agent": "Ready to write when you are.",
-    "editor_compliance_agent": "All quiet on the compliance front.",
-    "publisher_agent": "No PRs to push right now.",
-}
-
 
 def _post(data: dict):
     """POST JSON to the dashboard API."""
@@ -34,7 +27,8 @@ def _post(data: dict):
 
 
 def update(agent: str = None, status: str = None, speech: str = None,
-           log: str = None, pipeline_running: bool = None, current_topic: str = None,
+           log: str = None, thought: str = None, clear_thoughts: bool = False,
+           pipeline_running: bool = None, current_topic: str = None,
            run_complete: dict = None):
     """Push a status update to the dashboard."""
     data = {}
@@ -46,6 +40,10 @@ def update(agent: str = None, status: str = None, speech: str = None,
         data["speech"] = speech
     if log:
         data["log"] = log
+    if thought:
+        data["thought"] = thought
+    if clear_thoughts:
+        data["clear_thoughts"] = True
     if pipeline_running is not None:
         data["pipeline_running"] = pipeline_running
     if current_topic is not None:
@@ -58,6 +56,6 @@ def update(agent: str = None, status: str = None, speech: str = None,
 
 def reset_all_agents():
     """Set all agents back to idle."""
-    for agent_key, idle_text in IDLE_SPEECH.items():
-        update(agent=agent_key, status="idle", speech=idle_text)
+    for a in ["manager_agent", "seo_agent", "writer_agent", "editor_agent", "compliance_agent", "publisher_agent"]:
+        update(agent=a, status="idle", clear_thoughts=True)
     update(pipeline_running=False)
