@@ -21,6 +21,7 @@ import editor_agent
 import compliance_agent
 import sub_editor_agent
 import publisher_agent
+import agent_chat
 import dashboard_client as dash
 import db
 from config import load_site_config
@@ -140,12 +141,51 @@ def run_single_job(job: dict, site_config: dict, run_id: int) -> dict:
     final_draft, comp_result, edit_result, passed = _review_and_fix(draft, site_config, brief, run_id, kw)
 
     if not passed:
-        dash.update(agent="manager_agent", status="error",
-                    speech=f"Couldn't get \"{kw}\" through. Escalating.",
-                    log=f"ESCALATION: {kw}",
-                    thought=f"Job failed for \"{kw}\". After {MAX_REVISIONS} review cycles, still has issues. Escalating to founder.")
-        return {"topic": topic, "status": "review_failed",
-                "issues": comp_result.get("issues", []) + edit_result.get("issues", [])}
+        # Before escalating — let Emma and Clara discuss the remaining issues
+        all_remaining = comp_result.get("issues", []) + edit_result.get("issues", [])
+        issues_text = "\n".join(f"- {i}" for i in all_remaining)
+
+        dash.update(agent="manager_agent", status="working",
+                    speech=f"Emma and Clara discussing \"{kw}\"...",
+                    log=f"💬 Agents discussing: {kw}",
+                    thought=f"Review stuck after {MAX_REVISIONS} attempts. Opening discussion between Emma and Clara.")
+
+        context = (
+            f"Article: \"{kw}\"\n"
+            f"Issues after {MAX_REVISIONS} revision cycles:\n{issues_text}\n\n"
+            f"Can any of these be let through? Check your knowledge base for founder preferences."
+        )
+        thread = agent_chat.discuss(
+            ["editor_agent", "compliance_agent"], f"Review: {kw}", context, rounds=2
+        )
+
+        # Broadcast discussion to dashboard
+        for msg in thread.get("messages", []):
+            dash.update(agent=msg["agent"],
+                        speech=f"💬 {msg['text'][:80]}",
+                        thought=f"[Chat with {'Clara' if msg['agent']=='editor_agent' else 'Emma'}] {msg['text']}")
+
+        if thread.get("needs_founder"):
+            dash.update(agent="manager_agent", status="error",
+                        speech=f"Team needs your input on \"{kw}\". Check the chat!",
+                        log=f"@founder needed: {kw}",
+                        thought=f"Agents couldn't resolve it — need the founder.")
+            return {"topic": topic, "status": "needs_founder",
+                    "thread_id": thread["id"], "issues": all_remaining}
+
+        if thread.get("resolved"):
+            dash.update(agent="manager_agent", status="success",
+                        speech=f"Team resolved \"{kw}\" themselves!",
+                        log=f"✓ Agents resolved: {kw}",
+                        thought=f"Emma and Clara agreed the issues are acceptable. Publishing.")
+            # Agents resolved it — proceed to publish
+        else:
+            dash.update(agent="manager_agent", status="error",
+                        speech=f"Couldn't resolve \"{kw}\". Escalating.",
+                        log=f"ESCALATION: {kw}",
+                        thought=f"Discussion didn't resolve. Escalating.")
+            return {"topic": topic, "status": "review_failed",
+                    "issues": all_remaining, "thread_id": thread.get("id")}
 
     # Step 4: Publish
     dash.update(agent="publisher_agent", status="working",

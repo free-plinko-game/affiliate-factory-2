@@ -305,9 +305,107 @@
     .activity-log { max-height: 300px; overflow-y: auto; }
     .empty-state { color: #475569; font-size: 0.85rem; text-align: center; padding: 2rem; }
 
+    /* Messenger bubbles */
+    .messenger-bar {
+      position: fixed; bottom: 0; right: 2rem;
+      display: flex; gap: 0.5rem; align-items: flex-end;
+      z-index: 90;
+    }
+    .thread-bubble {
+      width: 320px; background: #1e293b;
+      border: 1px solid #334155; border-bottom: none;
+      border-radius: 12px 12px 0 0;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+      display: flex; flex-direction: column;
+      transition: all 0.3s ease;
+    }
+    .thread-bubble.minimized {
+      width: 240px; cursor: pointer;
+    }
+    .thread-bubble.minimized .thread-body,
+    .thread-bubble.minimized .thread-input-bar { display: none; }
+    .thread-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0.6rem 0.75rem;
+      border-bottom: 1px solid #334155;
+      cursor: pointer; user-select: none;
+    }
+    .thread-header-left {
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .thread-header-avatars {
+      display: flex;
+    }
+    .thread-header-avatars span {
+      font-size: 1rem; margin-right: -4px;
+    }
+    .thread-header-title {
+      font-size: 0.75rem; font-weight: 600; color: #e2e8f0;
+    }
+    .thread-header-topic {
+      font-size: 0.65rem; color: #64748b;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      max-width: 140px;
+    }
+    .thread-header-close {
+      background: none; border: none; color: #64748b;
+      font-size: 1rem; cursor: pointer; padding: 0 0.25rem;
+    }
+    .thread-header-close:hover { color: #e2e8f0; }
+    .thread-needs-founder .thread-header {
+      background: #7f1d1d; border-color: #991b1b;
+    }
+    .thread-needs-founder .thread-header-title { color: #fca5a5; }
+    .thread-badge {
+      background: #ef4444; color: white;
+      font-size: 0.55rem; font-weight: 700;
+      padding: 0.1rem 0.35rem; border-radius: 9999px;
+      animation: pulse 1.5s infinite;
+    }
+    .thread-body {
+      max-height: 250px; overflow-y: auto;
+      padding: 0.5rem;
+    }
+    .thread-msg {
+      display: flex; gap: 0.4rem; margin-bottom: 0.4rem;
+      animation: msgIn 0.2s ease;
+    }
+    .thread-msg-avatar { font-size: 0.9rem; flex-shrink: 0; margin-top: 0.1rem; }
+    .thread-msg-content {
+      background: #334155; border-radius: 8px;
+      padding: 0.35rem 0.6rem; font-size: 0.78rem;
+      line-height: 1.4; color: #cbd5e1; max-width: 240px;
+    }
+    .thread-msg.founder .thread-msg-content {
+      background: #1e3a5f; color: #bae6fd;
+    }
+    .thread-msg-name {
+      font-size: 0.6rem; font-weight: 600; color: #64748b;
+      margin-bottom: 0.1rem;
+    }
+    .thread-input-bar {
+      display: flex; gap: 0.4rem;
+      padding: 0.5rem; border-top: 1px solid #334155;
+    }
+    .thread-input {
+      flex: 1; background: #0f172a; border: 1px solid #334155;
+      border-radius: 16px; color: #e2e8f0;
+      padding: 0.4rem 0.75rem; font-family: inherit; font-size: 0.78rem;
+    }
+    .thread-input:focus { outline: none; border-color: #38bdf8; }
+    .thread-input::placeholder { color: #475569; }
+    .thread-send {
+      background: #38bdf8; color: #0f172a; border: none;
+      border-radius: 16px; padding: 0.4rem 0.75rem;
+      font-weight: 600; font-size: 0.75rem; cursor: pointer;
+    }
+    .thread-send:hover { background: #7dd3fc; }
+
     @media (max-width: 900px) {
       .office-floor { grid-template-columns: repeat(3, 1fr); }
       .bottom-panel { grid-template-columns: 1fr; }
+      .messenger-bar { right: 0.5rem; }
+      .thread-bubble { width: 280px; }
     }
     @media (max-width: 600px) { .office-floor { grid-template-columns: repeat(2, 1fr); } }
   </style>
@@ -336,6 +434,36 @@
   <div class="modal" id="modal" onclick="event.stopPropagation()">
     <button class="modal-close" onclick="document.getElementById('modal-overlay').classList.remove('open')">&times;</button>
     <div id="modal-content"></div>
+  </div>
+</div>
+
+<!-- Messenger bubbles -->
+<div class="messenger-bar" id="messenger-bar"></div>
+
+<div class="bottom-panel">
+  <div class="panel">
+    <h2>Job Queue <span id="queue-stats" style="float:right;font-size:0.7rem;color:#94a3b8"></span></h2>
+    <div id="queue-list">
+      <div class="empty-state">No jobs yet — send a brief above.</div>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>Schedules</h2>
+    <div id="schedule-list">
+      <div class="empty-state">No recurring schedules.</div>
+    </div>
+    <form class="schedule-form" onsubmit="return addSchedule(event)" style="margin-top:0.75rem;display:flex;gap:0.4rem">
+      <input type="text" id="sched-brief" placeholder="Weekly brief text..." style="flex:1;background:#0f172a;border:1px solid #334155;border-radius:8px;color:#e2e8f0;padding:0.4rem 0.6rem;font-size:0.75rem;font-family:inherit">
+      <select id="sched-freq" style="background:#0f172a;border:1px solid #334155;border-radius:8px;color:#e2e8f0;padding:0.4rem;font-size:0.75rem">
+        <option value="weekly">Weekly</option>
+        <option value="daily">Daily</option>
+      </select>
+      <select id="sched-day" style="background:#0f172a;border:1px solid #334155;border-radius:8px;color:#e2e8f0;padding:0.4rem;font-size:0.75rem">
+        <option value="monday">Mon</option><option value="tuesday">Tue</option><option value="wednesday">Wed</option>
+        <option value="thursday">Thu</option><option value="friday">Fri</option>
+      </select>
+      <button type="submit" style="background:#38bdf8;color:#0f172a;border:none;border-radius:8px;padding:0.4rem 0.8rem;font-weight:600;font-size:0.75rem;cursor:pointer">Add</button>
+    </form>
   </div>
 </div>
 
@@ -414,6 +542,7 @@ function openModal(agentKey, agents) {
     </div>
     <div class="modal-section">
       <h3>Thought process ${thoughts.length ? `(${thoughts.length})` : ''}</h3>
+      <div class="thoughts-container">
       ${thoughts.length
         ? thoughts.map((t, i) => `
           <div class="thought-entry ${i === 0 ? 'latest' : ''}">
@@ -423,6 +552,7 @@ function openModal(agentKey, agents) {
         `).join('')
         : '<div class="empty-state" style="padding:1rem">No thoughts yet — waiting for work.</div>'
       }
+      </div>
     </div>
   `;
   document.getElementById('modal-overlay').classList.add('open');
@@ -497,14 +627,30 @@ async function poll() {
     renderLog(currentState.activity_log);
     renderRuns(currentState.runs);
     updatePipelineStatus(currentState);
-    // Auto-refresh modal if open
+    // Update modal status/thoughts without re-rendering (preserves chat input)
     const overlay = document.getElementById('modal-overlay');
     if (overlay.classList.contains('open')) {
       const mc = document.getElementById('modal-content');
       const nameEl = mc.querySelector('.modal-name');
       if (nameEl) {
         const openAgent = AGENTS_ORDER.find(k => currentState.agents[k]?.name === nameEl.textContent);
-        if (openAgent) openModal(openAgent, currentState.agents);
+        if (openAgent) {
+          const a = currentState.agents[openAgent];
+          // Update status badge
+          const statusEl = mc.querySelector('.modal-status');
+          if (statusEl) { statusEl.className = `modal-status ${a.status}`; statusEl.textContent = a.status; }
+          // Update speech
+          const speechEl = mc.querySelector('.modal-speech');
+          if (speechEl) speechEl.textContent = a.speech;
+          // Update thoughts without touching chat
+          const thoughtsSection = mc.querySelector('.thoughts-container');
+          if (thoughtsSection) {
+            const thoughts = a.thoughts || [];
+            thoughtsSection.innerHTML = thoughts.length
+              ? thoughts.map((t, i) => `<div class="thought-entry ${i === 0 ? 'latest' : ''}"><span class="thought-time">${t.time}</span>${t.text}</div>`).join('')
+              : '<div class="empty-state" style="padding:1rem">No thoughts yet — waiting for work.</div>';
+          }
+        }
       }
     }
   } catch (e) {}
@@ -589,23 +735,215 @@ async function sendChat(e, agentKey) {
   return false;
 }
 
-function submitBrief(e) {
+async function submitBrief(e) {
   e.preventDefault();
   const input = document.getElementById('brief-input');
+  const btn = document.getElementById('brief-btn');
   const brief = input.value.trim();
   if (!brief) return false;
-  fetch('/api/update', {
+
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+  input.disabled = true;
+
+  try {
+    const res = await fetch('/api/brief', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ brief: brief })
+    });
+    const data = await res.json();
+    if (data.error) {
+      alert('Error: ' + data.error);
+    } else {
+      input.value = '';
+    }
+  } catch (err) {
+    alert('Failed to submit brief');
+  }
+
+  input.disabled = false;
+  btn.disabled = false;
+  btn.textContent = 'Send Brief';
+  return false;
+}
+
+// Queue & Schedules
+async function pollQueue() {
+  try {
+    const res = await fetch('/api/queue');
+    const data = await res.json();
+    const stats = data.stats || {};
+    document.getElementById('queue-stats').textContent =
+      `${stats.queued || 0} queued · ${stats.running || 0} running · ${stats.published || 0} published`;
+
+    const el = document.getElementById('queue-list');
+    const jobs = data.jobs || [];
+    if (!jobs.length) {
+      el.innerHTML = '<div class="empty-state">No jobs yet — send a brief above.</div>';
+    } else {
+      el.innerHTML = jobs.slice(0, 10).map(j => `
+        <div class="run-entry">
+          <span class="run-topic">${j.topic}</span>
+          <span class="run-jobs">${j.content_type}</span>
+          <span class="run-status ${j.status}">${j.status}</span>
+        </div>
+      `).join('');
+    }
+  } catch (e) {}
+}
+
+async function pollSchedules() {
+  try {
+    const res = await fetch('/api/schedules');
+    const scheds = await res.json();
+    const el = document.getElementById('schedule-list');
+    if (!scheds.length) {
+      el.innerHTML = '<div class="empty-state">No recurring schedules.</div>';
+    } else {
+      el.innerHTML = scheds.map(s => `
+        <div class="run-entry">
+          <span class="run-topic">${s.brief.substring(0, 50)}${s.brief.length > 50 ? '...' : ''}</span>
+          <span class="run-jobs">${s.frequency} · ${s.day || ''}</span>
+          <button onclick="deleteSchedule(${s.id})" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:0.7rem">✕</button>
+        </div>
+      `).join('');
+    }
+  } catch (e) {}
+}
+
+async function addSchedule(e) {
+  e.preventDefault();
+  const brief = document.getElementById('sched-brief').value.trim();
+  if (!brief) return false;
+  await fetch('/api/schedules', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
-      pipeline_running: true, current_topic: brief,
-      agent: 'manager_agent', status: 'working',
-      speech: 'New brief received! Reading...',
-      log: 'Brief submitted: ' + brief,
+      brief: brief,
+      frequency: document.getElementById('sched-freq').value,
+      day: document.getElementById('sched-day').value,
     })
   });
-  input.value = '';
+  document.getElementById('sched-brief').value = '';
+  pollSchedules();
   return false;
+}
+
+async function deleteSchedule(id) {
+  await fetch(`/api/schedules/${id}`, { method: 'DELETE' });
+  pollSchedules();
+}
+
+// Thread management
+let openThreads = {};  // { threadId: { minimized: bool } }
+let knownThreadIds = new Set();
+
+function renderThreadBubble(thread) {
+  const id = thread.id;
+  const isMinimized = openThreads[id]?.minimized ?? true;
+  const participants = thread.participants || [];
+  const emojis = participants.map(p => currentState.agents?.[p]?.emoji || '💬');
+  const names = participants.map(p => currentState.agents?.[p]?.name || p);
+  const needsFounder = thread.needs_founder;
+
+  let html = `<div class="thread-bubble ${isMinimized ? 'minimized' : ''} ${needsFounder ? 'thread-needs-founder' : ''}" id="thread-${id}">`;
+  html += `<div class="thread-header" onclick="toggleThread('${id}')">
+    <div class="thread-header-left">
+      <div class="thread-header-avatars">${emojis.map(e => `<span>${e}</span>`).join('')}</div>
+      <div>
+        <div class="thread-header-title">${names.join(' & ')}${needsFounder ? ' <span class="thread-badge">needs you</span>' : ''}</div>
+        <div class="thread-header-topic">${thread.topic || ''}</div>
+      </div>
+    </div>
+    <button class="thread-header-close" onclick="event.stopPropagation(); closeThread('${id}')">&times;</button>
+  </div>`;
+
+  html += `<div class="thread-body" id="thread-body-${id}">`;
+  (thread.messages || []).forEach(m => {
+    const isFounder = m.is_founder;
+    html += `<div class="thread-msg ${isFounder ? 'founder' : ''}">
+      <span class="thread-msg-avatar">${m.emoji || '👤'}</span>
+      <div class="thread-msg-content">
+        <div class="thread-msg-name">${m.name} · ${m.time || ''}</div>
+        ${m.text}
+      </div>
+    </div>`;
+  });
+  html += `</div>`;
+
+  html += `<div class="thread-input-bar">
+    <input type="text" class="thread-input" id="thread-input-${id}" placeholder="Jump in..." onkeydown="if(event.key==='Enter')sendThreadReply('${id}')">
+    <button class="thread-send" onclick="sendThreadReply('${id}')">Send</button>
+  </div>`;
+
+  html += `</div>`;
+  return html;
+}
+
+function toggleThread(id) {
+  if (!openThreads[id]) openThreads[id] = { minimized: true };
+  openThreads[id].minimized = !openThreads[id].minimized;
+  renderThreads();
+}
+
+function closeThread(id) {
+  delete openThreads[id];
+  renderThreads();
+}
+
+async function sendThreadReply(threadId) {
+  const input = document.getElementById(`thread-input-${threadId}`);
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  input.disabled = true;
+
+  try {
+    const res = await fetch(`/api/threads/${threadId}/reply`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ message: msg })
+    });
+    await pollThreads();
+  } catch (e) {}
+  input.disabled = false;
+  input.focus();
+}
+
+function renderThreads() {
+  const bar = document.getElementById('messenger-bar');
+  bar.innerHTML = '';
+  for (const [id, state] of Object.entries(openThreads)) {
+    const thread = cachedThreads.find(t => t.id === id);
+    if (thread) bar.innerHTML += renderThreadBubble(thread);
+  }
+  // Scroll thread bodies to bottom
+  for (const id of Object.keys(openThreads)) {
+    const body = document.getElementById(`thread-body-${id}`);
+    if (body) body.scrollTop = body.scrollHeight;
+  }
+}
+
+let cachedThreads = [];
+
+async function pollThreads() {
+  try {
+    const res = await fetch('/api/threads');
+    cachedThreads = await res.json();
+    // Auto-open new threads
+    cachedThreads.forEach(t => {
+      if (!knownThreadIds.has(t.id)) {
+        knownThreadIds.add(t.id);
+        openThreads[t.id] = { minimized: false };
+      }
+      // Update existing open threads
+      if (openThreads[t.id]) {
+        // re-render to show new messages
+      }
+    });
+    renderThreads();
+  } catch (e) {}
 }
 
 currentState = {{ state | tojson }};
@@ -614,6 +952,11 @@ renderLog(currentState.activity_log);
 renderRuns(currentState.runs);
 updatePipelineStatus(currentState);
 setInterval(poll, 1500);
+setInterval(pollThreads, 2000);
+setInterval(pollQueue, 3000);
+setInterval(pollSchedules, 10000);
+pollQueue();
+pollSchedules();
 </script>
 </body>
 </html>

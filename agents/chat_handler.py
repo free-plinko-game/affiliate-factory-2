@@ -135,11 +135,7 @@ You SHOULD NOT:
 Your knowledge base (things the founder has told you to remember):
 {kb if kb else '(Nothing yet)'}
 
-If the founder gives you feedback or a preference you should remember for future work,
-end your reply with EXACTLY this format on a new line:
-💾 [one-line summary of what to remember]
-
-Only do this for actionable preferences, not for casual chat."""
+Your preferences and feedback from the founder are tracked automatically — just be yourself."""
 
     # Build messages
     messages = [{"role": "system", "content": system_prompt}]
@@ -160,22 +156,37 @@ Only do this for actionable preferences, not for casual chat."""
 
     reply = response.choices[0].message.content.strip()
 
-    # Check for knowledge update
-    knowledge_updated = False
-    clean_reply = reply
-    if "💾" in reply:
-        lines = reply.split("\n")
-        kb_lines = [l for l in lines if l.strip().startswith("💾")]
-        other_lines = [l for l in lines if not l.strip().startswith("💾")]
-        clean_reply = "\n".join(other_lines).strip()
+    # Strip any 💾 markers from the reply (keep it clean)
+    clean_reply = "\n".join(
+        l for l in reply.split("\n") if not l.strip().startswith("💾")
+    ).strip()
 
-        if kb_lines:
-            current_kb = load_knowledge(agent_key)
-            new_items = "\n".join(f"- {l.replace('💾', '').strip()}" for l in kb_lines)
-            updated_kb = current_kb.rstrip() + "\n" + new_items + "\n"
-            save_knowledge(agent_key, updated_kb)
-            knowledge_updated = True
-            logger.info("KB updated for %s: %s", agent_key, kb_lines)
+    # Second pass: ask a fast model if there's actionable feedback to save
+    knowledge_updated = False
+    kb_extract = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": (
+                "You extract actionable preferences from a conversation between a founder and an employee. "
+                "If the founder gave feedback, a preference, or a guideline the employee should remember "
+                "for future work, return it as a single concise bullet point. "
+                "If there's nothing actionable (just casual chat, questions, or greetings), return exactly: NONE"
+            )},
+            {"role": "user", "content": f"Founder said: {message}\n\nEmployee ({name}) replied: {clean_reply}"},
+        ],
+        temperature=0.0,
+        max_tokens=100,
+    )
+    extracted = kb_extract.choices[0].message.content.strip()
+
+    if extracted and extracted.upper() != "NONE":
+        current_kb = load_knowledge(agent_key)
+        # Clean up the bullet point
+        item = extracted.lstrip("-•* ").strip()
+        updated_kb = current_kb.rstrip() + f"\n- {item}\n"
+        save_knowledge(agent_key, updated_kb)
+        knowledge_updated = True
+        logger.info("KB updated for %s: %s", agent_key, item)
 
     # Save to history
     now = datetime.now(timezone.utc).strftime("%H:%M")

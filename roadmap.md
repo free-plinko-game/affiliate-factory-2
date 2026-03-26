@@ -224,13 +224,13 @@ it was written to, and the compliance check result. Do not merge — leave for h
 ---
 
 ### Phase 1 success criteria
-- [ ] Hugo site live on VPS, auto-deploying from GitHub
-- [ ] SEO Agent produces a valid content brief from a keyword seed
-- [ ] Writer Agent produces a publishable Hugo markdown file from that brief
-- [ ] Editor/Compliance Agent returns a structured pass/fail JSON
-- [ ] Publisher Agent opens a PR on GitHub
-- [ ] You merge PR, site rebuilds and deploys automatically
-- [ ] End-to-end time from brief to PR under 10 minutes
+- [x] Hugo site live on VPS, auto-deploying from GitHub → **http://68.183.44.120:3284/**
+- [x] SEO Agent produces a valid content brief from a keyword seed
+- [x] Writer Agent produces a publishable Hugo markdown file from that brief
+- [x] Editor/Compliance Agent returns a structured pass/fail JSON
+- [x] Publisher Agent opens a PR on GitHub
+- [x] You merge PR, site rebuilds and deploys automatically
+- [x] End-to-end time from brief to PR under 10 minutes → **~60 seconds**
 
 ---
 
@@ -322,11 +322,19 @@ Simple internal tool. Shows pipeline run status, content in review, published pa
 ---
 
 ### Phase 2 success criteria
-- [ ] Single brief to Manager Agent triggers full pipeline without manual steps
-- [ ] Compliance fail routes back to Writer automatically
-- [ ] Pipeline logs every step with timestamps
-- [ ] Flask dashboard shows run history and pending PRs
-- [ ] Founder only touches the system to merge PRs and submit new briefs
+- [x] Single brief to Manager Agent triggers full pipeline without manual steps
+- [x] Compliance fail routes back to ~~Writer~~ Sub-Editor (Sam) automatically
+- [x] Pipeline logs every step with timestamps (SQLite)
+- [x] Flask dashboard shows run history and pending PRs → **http://68.183.44.120:5050/**
+- [x] Founder only touches the system to merge PRs and submit new briefs
+
+### Built beyond original Phase 2 plan
+- **Sub-Editor Agent (Sam)** — handles surgical revisions, freeing Will for the next job
+- **Knowledge bases per agent** — each agent has a persistent .md file with learned preferences
+- **Live chat with agents** — click any agent in dashboard, chat like Slack DM, feedback auto-saved to KB
+- **Agent-to-agent chat** — Emma & Clara discuss borderline issues before escalating; Messenger-style bubbles in dashboard
+- **Hybrid compliance** — programmatic checks (word count, 18+, BeGambleAware, T&Cs) + LLM for subjective review
+- **Agent personalities** — each agent has character, can push back, disagree, and have opinions
 
 ---
 
@@ -580,14 +588,15 @@ Refactor Python scripts into a proper MCP server implementation.
 
 ## Agent index
 
-| Agent | Phase introduced | Reports to | Tools needed |
-|---|---|---|---|
-| SEO Agent | 1 | Head of SEO | Web search, KW data |
-| Writer Agent | 1 | Head of Content | None (LLM only) |
-| Editor Agent | 2 | Head of Content | None (LLM only) |
-| Compliance Agent | 2 | Head of Commercial | Compliance ruleset files |
-| Publisher Agent | 1 | Manager | GitHub API |
-| Manager Agent | 2 | Founder | All agent APIs |
+| Agent | Name | Phase | Status | Reports to | Tools |
+|---|---|---|---|---|---|
+| Manager Agent | Max | 2 | **Live** | Founder | All agent APIs |
+| SEO Agent | Sarah | 1 | **Live** | Manager | Web search, KW data |
+| Writer Agent | Will | 1 | **Live** | Manager | None (LLM only) |
+| Editor Agent | Emma | 2 | **Live** | Manager | None (LLM only) |
+| Sub-Editor Agent | Sam | 2 | **Live** | Emma | None (LLM only) |
+| Compliance Agent | Clara | 2 | **Live** | Manager | Programmatic + LLM |
+| Publisher Agent | Pete | 1 | **Live** | Manager | GitHub API (PyGithub) |
 | Head of Content | 3 | Manager | Pipeline runner |
 | Head of SEO | 3 | Manager | Rank data, GSC API |
 | Head of Tech | 3 | Manager | VPS metrics, GitHub API |
