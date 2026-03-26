@@ -3,7 +3,7 @@
 import json
 import logging
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 
 import seo_agent
 import writer_agent
@@ -13,7 +13,7 @@ from config import load_site_config
 
 logger = logging.getLogger(__name__)
 
-MAX_REVISIONS = 2
+MAX_REVISIONS = 3
 
 
 def run_pipeline(topic: str, site_config: dict | None = None, publish: bool = True) -> dict:
@@ -32,12 +32,12 @@ def run_pipeline(topic: str, site_config: dict | None = None, publish: bool = Tr
 
     result = {
         "topic": topic,
-        "started_at": datetime.utcnow().isoformat(),
+        "started_at": datetime.now(timezone.utc).isoformat(),
         "steps": [],
     }
 
     def log_step(name, data):
-        step = {"step": name, "timestamp": datetime.utcnow().isoformat(), "data": data}
+        step = {"step": name, "timestamp": datetime.now(timezone.utc).isoformat(), "data": data}
         result["steps"].append(step)
         logger.info("Step complete: %s", name)
 
@@ -52,7 +52,7 @@ def run_pipeline(topic: str, site_config: dict | None = None, publish: bool = Tr
     log_step("first_draft", {"length": len(draft), "keyword": brief.get("target_keyword")})
 
     # Step 3: Edit + compliance (with retry)
-    compliance_result = None
+    compliance_result: dict = {}
     for attempt in range(1, MAX_REVISIONS + 1):
         logger.info("Step 3: Review attempt %d/%d", attempt, MAX_REVISIONS)
         compliance_result = editor_compliance_agent.run(draft, site_config, brief)
@@ -66,13 +66,17 @@ def run_pipeline(topic: str, site_config: dict | None = None, publish: bool = Tr
             logger.info("Issues found, sending back to writer for revision")
             issues = compliance_result.get("issues", [])
             remediation = compliance_result.get("remediation", [])
-            all_feedback = issues + remediation
-            draft = writer_agent.run(brief, site_config, issues=all_feedback)
+            # Pair each issue with its fix for clarity
+            all_feedback = []
+            for i, issue in enumerate(issues):
+                fix = remediation[i] if i < len(remediation) else ""
+                all_feedback.append(f"ISSUE: {issue} → FIX: {fix}")
+            draft = writer_agent.run(brief, site_config, issues=all_feedback, previous_draft=draft)
             log_step(f"revision_{attempt}", {"length": len(draft)})
 
     if not compliance_result["compliance_pass"]:
         result["status"] = "compliance_failed"
-        result["finished_at"] = datetime.utcnow().isoformat()
+        result["finished_at"] = datetime.now(timezone.utc).isoformat()
         logger.error("ESCALATION: Compliance failed after %d attempts — needs founder review", MAX_REVISIONS)
         print("\n⚠ COMPLIANCE FAILED — requires founder review")
         print(json.dumps(compliance_result, indent=2))
@@ -91,7 +95,7 @@ def run_pipeline(topic: str, site_config: dict | None = None, publish: bool = Tr
         result["draft"] = draft
         print("\n✓ Content approved (publish=False, no PR created)")
 
-    result["finished_at"] = datetime.utcnow().isoformat()
+    result["finished_at"] = datetime.now(timezone.utc).isoformat()
     return result
 
 
@@ -108,7 +112,7 @@ if __name__ == "__main__":
     result = run_pipeline(topic, publish=publish)
 
     # Save pipeline log
-    log_path = f"pipeline_log_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"
+    log_path = f"pipeline_log_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
     with open(log_path, "w") as f:
         json.dump(result, f, indent=2)
     logger.info("Pipeline log saved: %s", log_path)

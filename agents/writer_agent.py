@@ -11,7 +11,7 @@ from config import load_prompt, load_site_config
 logger = logging.getLogger(__name__)
 
 
-def run(brief: dict, site_config: dict | None = None, issues: list[str] | None = None) -> str:
+def run(brief: dict, site_config: dict | None = None, issues: list[str] | None = None, previous_draft: str | None = None) -> str:
     """Write an article from a content brief.
 
     Args:
@@ -32,9 +32,18 @@ def run(brief: dict, site_config: dict | None = None, issues: list[str] | None =
         f"Today's date: {date.today().isoformat()}"
     )
 
-    if issues:
+    if issues and previous_draft:
         user_message += (
-            f"\n\nREVISION REQUIRED — fix these issues from the editor/compliance review:\n"
+            f"\n\nREVISION REQUIRED — here is the current draft that needs fixing:\n\n"
+            f"{previous_draft}\n\n"
+            f"Fix ALL of the following issues. Keep the existing structure and content — "
+            f"expand and correct, do not shorten or rewrite from scratch. "
+            f"The revised article must be LONGER than the original, not shorter.\n\n"
+            + "\n".join(f"- {issue}" for issue in issues)
+        )
+    elif issues:
+        user_message += (
+            f"\n\nREVISION REQUIRED — fix ALL of these issues:\n\n"
             + "\n".join(f"- {issue}" for issue in issues)
         )
 
