@@ -1,17 +1,24 @@
 """SEO Agent (Sarah) — generates structured content briefs from keyword seeds.
 
-Reads the content register before briefing to avoid keyword cannibalization.
+Uses the Sitemap Reader tool to check what's already live on the site.
+Reads the content register for in-progress content.
+Prevents keyword cannibalization at source.
 """
 
 import json
 import logging
 import sys
+from pathlib import Path
 
 from openai import OpenAI
 
 from config import load_prompt, load_site_config
-sys.path.insert(0, str(__import__('pathlib').Path(__file__).parent.parent / "db"))
+
+# Add paths for tools and db
+sys.path.insert(0, str(Path(__file__).parent.parent / "db"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "tools"))
 import state
+import sitemap_reader
 
 logger = logging.getLogger(__name__)
 
@@ -19,29 +26,44 @@ logger = logging.getLogger(__name__)
 def run(topic: str, site_config: dict | None = None) -> dict:
     """Generate a content brief from a topic or keyword seed.
 
-    Checks the content register first to avoid duplicating existing content.
+    1. Fetches live sitemap to see what's already published
+    2. Checks content register for in-progress content
+    3. Blocks duplicate keywords, forces different angle
     """
     if site_config is None:
         site_config = load_site_config()
 
     site_slug = site_config.get("site_slug", "site-a")
+    domain = site_config.get("domain", "")
 
-    # Check what already exists
-    existing_content = state.get_content_for_agent(site_slug)
-    duplicate_warning = ""
-    if state.keyword_exists(site_slug, topic):
-        duplicate_warning = (
-            f"\n\n⚠ WARNING: The keyword \"{topic}\" (or similar) already exists in the content register. "
-            f"You MUST choose a different angle, long-tail variation, or related keyword to avoid cannibalization. "
-            f"Do NOT brief the same keyword again."
+    # Tool 1: Check live sitemap
+    live_content = sitemap_reader.get_existing_topics(domain)
+    overlaps = sitemap_reader.check_overlap(domain, topic)
+
+    # Tool 2: Check content register (in-progress stuff not yet live)
+    in_progress = state.get_content_for_agent(site_slug)
+
+    # Build duplicate warnings
+    duplicate_block = ""
+    if overlaps:
+        overlap_slugs = ", ".join(f"\"{p.slug}\"" for p in overlaps)
+        logger.warning("Keyword overlap detected: '%s' overlaps with %s", topic, overlap_slugs)
+        duplicate_block = (
+            f"\n\n🚫 DUPLICATE DETECTED: The topic \"{topic}\" overlaps with existing live pages: {overlap_slugs}\n"
+            f"You MUST choose a DIFFERENT keyword. Suggestions:\n"
+            f"- Find a long-tail variation (e.g. 'wagering requirements' → 'low wagering casino bonuses UK')\n"
+            f"- Find a related subtopic not yet covered\n"
+            f"- Target a different search intent for the same topic area\n"
+            f"Your target_keyword MUST NOT match any existing page slug."
         )
 
     system_prompt = load_prompt("seo_agent")
     user_message = (
         f"Site config:\n{json.dumps(site_config, indent=2)}\n\n"
         f"Topic/keyword seed: {topic}\n\n"
-        f"{existing_content}"
-        f"{duplicate_warning}"
+        f"{live_content}\n\n"
+        f"In-progress content (not yet live):\n{in_progress}"
+        f"{duplicate_block}"
     )
 
     client = OpenAI()
@@ -56,6 +78,30 @@ def run(topic: str, site_config: dict | None = None) -> dict:
     )
 
     brief = json.loads(response.choices[0].message.content)
+
+    # Post-check: verify the LLM didn't ignore the duplicate warning
+    if overlaps:
+        chosen_kw = brief.get("target_keyword", "").lower().replace(" ", "-")
+        for p in overlaps:
+            if chosen_kw == p.slug or chosen_kw in p.slug or p.slug in chosen_kw:
+                logger.warning("Sarah tried to use duplicate keyword '%s' — forcing variation", chosen_kw)
+                # Force a re-run with stronger instruction
+                user_message += (
+                    f"\n\nYou returned \"{brief.get('target_keyword')}\" which STILL matches an existing page. "
+                    f"This is NOT acceptable. Pick something COMPLETELY different."
+                )
+                response = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_message},
+                    ],
+                    temperature=0.6,
+                    response_format={"type": "json_object"},
+                )
+                brief = json.loads(response.choices[0].message.content)
+                break
+
     logger.info("SEO brief: %s → keyword: %s", topic, brief.get("target_keyword"))
     return brief
 
