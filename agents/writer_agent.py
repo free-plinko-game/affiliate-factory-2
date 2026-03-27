@@ -1,12 +1,18 @@
-"""Writer Agent — produces Hugo-ready markdown from a content brief."""
+"""Writer Agent (Will) — produces Hugo-ready markdown from a content brief.
+
+Reads the content register for internal linking opportunities.
+"""
 
 import json
 import logging
+import sys
 from datetime import date
 
 from openai import OpenAI
 
 from config import load_prompt, load_site_config
+sys.path.insert(0, str(__import__('pathlib').Path(__file__).parent.parent / "db"))
+import state
 
 logger = logging.getLogger(__name__)
 
@@ -25,11 +31,15 @@ def run(brief: dict, site_config: dict | None = None, issues: list[str] | None =
     if site_config is None:
         site_config = load_site_config()
 
+    site_slug = site_config.get("site_slug", "site-a")
+    existing_content = state.get_content_for_agent(site_slug)
+
     system_prompt = load_prompt("writer_agent")
     user_message = (
         f"Site config:\n{json.dumps(site_config, indent=2)}\n\n"
         f"Content brief:\n{json.dumps(brief, indent=2)}\n\n"
-        f"Today's date: {date.today().isoformat()}"
+        f"Today's date: {date.today().isoformat()}\n\n"
+        f"Existing content on this site (use for internal linking where relevant):\n{existing_content}"
     )
 
     if issues and previous_draft:

@@ -222,7 +222,7 @@ def api_threads():
     import sys
     sys.path.insert(0, str(Path(__file__).parent.parent / "agents"))
     import agent_chat
-    return jsonify(agent_chat.get_active_threads())
+    return jsonify(agent_chat.get_all_threads())
 
 
 @app.route("/api/threads/<thread_id>")
@@ -253,12 +253,130 @@ def api_thread_reply(thread_id):
     # Let the agents respond to the founder
     thread = agent_chat.get_thread(thread_id)
     if thread:
-        for p in thread["participants"]:
-            import os
-            if os.environ.get("OPENAI_API_KEY"):
+        import os
+        if os.environ.get("OPENAI_API_KEY"):
+            for p in thread["participants"]:
                 agent_chat.agent_says(thread_id, p)
 
+            # Check if founder asked agents to loop someone else in
+            spawned = _check_spawn_request(message, thread, agent_chat)
+            if spawned:
+                return jsonify({**agent_chat.get_thread(thread_id), "spawned_thread": spawned})
+
+            # Check if founder asked Max to retry
+            retried = _check_retry_request(message, thread)
+            if retried:
+                return jsonify({**agent_chat.get_thread(thread_id), "retried_job": retried})
+
     return jsonify(agent_chat.get_thread(thread_id))
+
+
+# Agent name → key mapping for spawn detection
+_AGENT_LOOKUP = {
+    "max": "manager_agent", "sarah": "seo_agent", "will": "writer_agent",
+    "emma": "editor_agent", "sam": "sub_editor_agent", "clara": "compliance_agent",
+    "pete": "publisher_agent",
+}
+
+def _check_spawn_request(message: str, thread: dict, agent_chat_mod):
+    """Detect if the founder is asking an agent to start a chat with another agent."""
+    msg_lower = message.lower()
+
+    # Look for patterns like "chat with Sam", "chat to Sam", "talk to Will", etc.
+    triggers = [
+        "chat with", "chat to", "talk to", "talk with", "discuss with",
+        "speak to", "speak with", "loop in", "bring in", "pull in",
+        "start a chat with", "start a conversation with", "have a word with",
+        "get ", "ask ",
+    ]
+    target_name = None
+    for trigger in triggers:
+        if trigger in msg_lower:
+            # Extract the name after the trigger
+            after = msg_lower.split(trigger, 1)[1].strip().split()[0].rstrip(".,!?")
+            if after in _AGENT_LOOKUP:
+                target_name = after
+                break
+
+    if not target_name:
+        return None
+
+    target_key = _AGENT_LOOKUP[target_name]
+
+    # Figure out which participant in the current thread was asked to start the chat
+    # Use the first participant that isn't the target
+    initiator = None
+    for p in thread["participants"]:
+        if p != target_key:
+            initiator = p
+            break
+    if not initiator:
+        initiator = thread["participants"][0]
+
+    # Get context from the current thread
+    recent_msgs = thread.get("messages", [])[-5:]
+    context_summary = "\n".join(f"{m['name']}: {m['text']}" for m in recent_msgs)
+
+    # Create new thread between the agents
+    new_thread_id = agent_chat_mod.create_thread(
+        [initiator, target_key],
+        thread.get("topic", "Discussion"),
+        f"The founder asked you to have this conversation.\n\nContext from previous chat:\n{context_summary}"
+    )
+
+    # Have both agents speak
+    agent_chat_mod.agent_says(new_thread_id, initiator)
+    agent_chat_mod.agent_says(new_thread_id, target_key)
+
+    return new_thread_id
+
+
+def _check_retry_request(message: str, thread: dict):
+    """Detect if the founder is asking Max to retry a failed job."""
+    msg_lower = message.lower()
+    retry_triggers = ["retry", "try again", "run it again", "rerun", "re-run", "have another go",
+                      "kick it off again", "give it another shot", "redo"]
+
+    if not any(t in msg_lower for t in retry_triggers):
+        return None
+
+    # Check Max is in the thread
+    if "manager_agent" not in thread.get("participants", []):
+        return None
+
+    # Extract the topic from the thread
+    topic = thread.get("topic", "").replace("Review: ", "").replace("Failed: ", "").strip()
+    if not topic:
+        return None
+
+    import sys, os, threading
+    sys.path.insert(0, str(Path(__file__).parent.parent / "agents"))
+    import job_queue, worker
+
+    # Queue the retry
+    job_id = job_queue.add_job(topic=topic, priority="high")
+
+    # Update dashboard state
+    state = read_state()
+    if "manager_agent" in state["agents"]:
+        state["agents"]["manager_agent"]["status"] = "working"
+        state["agents"]["manager_agent"]["speech"] = f"Retrying \"{topic}\"..."
+    entry = {
+        "time": datetime.now(timezone.utc).strftime("%H:%M:%S"),
+        "agent": "manager_agent",
+        "message": f"Retrying: {topic} (job #{job_id})",
+    }
+    state.setdefault("activity_log", []).insert(0, entry)
+    state["pipeline_running"] = True
+    write_state(state)
+
+    # Run in background
+    def run_retry():
+        worker.run_queue()
+
+    threading.Thread(target=run_retry, daemon=True).start()
+
+    return {"job_id": job_id, "topic": topic}
 
 
 @app.route("/api/brief", methods=["POST"])
@@ -367,6 +485,37 @@ def api_delete_schedule(sid):
     import scheduler
     scheduler.remove_schedule(sid)
     return jsonify({"ok": True})
+
+
+@app.route("/api/content-register")
+def api_content_register():
+    """Get the content register."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent / "db"))
+    import state as st
+    site_slug = request.args.get("site", "site-a")
+    return jsonify(st.get_all_content(site_slug))
+
+
+@app.route("/api/content-calendar")
+def api_content_calendar():
+    """Get the content calendar."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent / "db"))
+    import state as st
+    site_slug = request.args.get("site", "site-a")
+    return jsonify(st.get_calendar(site_slug))
+
+
+@app.route("/api/learnings")
+def api_learnings():
+    """Get agent learning log."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent / "db"))
+    import state as st
+    agent = request.args.get("agent")
+    ltype = request.args.get("type")
+    return jsonify(st.get_learnings(agent_name=agent, learning_type=ltype, limit=50))
 
 
 @app.route("/api/knowledge/<agent_key>")

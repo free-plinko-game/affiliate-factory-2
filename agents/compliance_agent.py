@@ -7,8 +7,11 @@ import re
 from openai import OpenAI
 
 from config import load_prompt, load_site_config
+import agent_session as session
 
 logger = logging.getLogger(__name__)
+
+AGENT_KEY = "compliance_agent"
 
 PRESSURE_PHRASES = [
     "act now", "don't miss out", "limited time", "hurry",
@@ -74,29 +77,35 @@ def run(draft: str, site_config: dict | None = None, brief: dict | None = None) 
     if site_config is None:
         site_config = load_site_config()
 
+    kw = brief.get("target_keyword", "article") if brief else "article"
+
     # Step 1: Programmatic checks
     prog_issues, prog_remediation = _programmatic_checks(draft)
     if prog_issues:
         logger.info("Programmatic compliance failed: %d issues", len(prog_issues))
+        session.add_event(AGENT_KEY, "user", f"[Compliance check] \"{kw}\"", "pipeline")
+        session.add_event(AGENT_KEY, "assistant",
+                          f"[Compliance] \"{kw}\" — FAILED (programmatic): {'; '.join(prog_issues)}", "pipeline")
         return {
             "compliance_pass": False,
             "issues": prog_issues,
             "remediation": prog_remediation,
         }
 
-    # Step 2: LLM checks for subjective compliance
-    system_prompt = load_prompt("compliance_agent")
+    # Step 2: LLM checks with session context
+    system_prompt = load_prompt(AGENT_KEY)
     user_message = f"Site config:\n{json.dumps(site_config, indent=2)}\n\nArticle to review:\n{draft}"
     if brief:
         user_message += f"\n\nContent brief:\n{json.dumps(brief, indent=2)}"
 
+    messages = [{"role": "system", "content": system_prompt}]
+    messages.extend(session.get_messages_for_llm(AGENT_KEY))
+    messages.append({"role": "user", "content": user_message})
+
     client = OpenAI()
     response = client.chat.completions.create(
         model="gpt-4o",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message},
-        ],
+        messages=messages,
         temperature=0.0,
         response_format={"type": "json_object"},
     )
@@ -105,6 +114,14 @@ def run(draft: str, site_config: dict | None = None, brief: dict | None = None) 
     result.setdefault("compliance_pass", False)
     result.setdefault("issues", [])
     result.setdefault("remediation", [])
+
+    # Log to session
+    session.add_event(AGENT_KEY, "user", f"[Compliance check] \"{kw}\"", "pipeline")
+    if result["compliance_pass"]:
+        session.add_event(AGENT_KEY, "assistant", f"[Compliance] \"{kw}\" — PASSED.", "pipeline")
+    else:
+        session.add_event(AGENT_KEY, "assistant",
+                          f"[Compliance] \"{kw}\" — FAILED: {'; '.join(result['issues'][:3])}", "pipeline")
 
     logger.info("Compliance review: %s (%d issues)", result["compliance_pass"], len(result["issues"]))
     return result

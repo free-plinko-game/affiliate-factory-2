@@ -469,10 +469,38 @@
 
 <div class="bottom-panel">
   <div class="panel">
+    <h2>Content Register</h2>
+    <div id="content-register" style="max-height:250px;overflow-y:auto">
+      <div class="empty-state">No content registered yet.</div>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>Content Calendar</h2>
+    <div id="content-calendar" style="max-height:250px;overflow-y:auto">
+      <div class="empty-state">Calendar empty.</div>
+    </div>
+  </div>
+</div>
+
+<div class="bottom-panel">
+  <div class="panel">
+    <h2>Agent Learnings <select id="learning-filter" onchange="pollLearnings()" style="float:right;background:#0f172a;border:1px solid #334155;border-radius:6px;color:#e2e8f0;padding:0.2rem 0.4rem;font-size:0.7rem"><option value="">All</option><option value="emma">Emma</option><option value="clara">Clara</option><option value="will">Will</option><option value="sarah">Sarah</option><option value="sam">Sam</option></select></h2>
+    <div id="learnings-list" style="max-height:250px;overflow-y:auto">
+      <div class="empty-state">No learnings yet.</div>
+    </div>
+  </div>
+  <div class="panel">
     <h2>Activity Log</h2>
     <div class="activity-log" id="activity-log">
       <div class="empty-state">No activity yet — send a brief to get the office moving.</div>
     </div>
+  </div>
+</div>
+
+<div class="bottom-panel">
+  <div class="panel">
+    <h2>Job Queue <span id="queue-stats" style="float:right;font-size:0.7rem;color:#94a3b8"></span></h2>
+    <div id="queue-list"><div class="empty-state">No jobs.</div></div>
   </div>
   <div class="panel">
     <h2>Pipeline Runs</h2>
@@ -768,6 +796,56 @@ async function submitBrief(e) {
   return false;
 }
 
+// Content Register & Calendar
+async function pollContentRegister() {
+  try {
+    const res = await fetch('/api/content-register?site=site-a');
+    const data = await res.json();
+    const el = document.getElementById('content-register');
+    if (!data.length) { el.innerHTML = '<div class="empty-state">No content registered yet.</div>'; return; }
+    el.innerHTML = data.map(c => `
+      <div class="run-entry">
+        <span class="run-topic">${c.keyword}</span>
+        <span class="run-jobs">${c.content_type}</span>
+        <span class="run-status ${c.status}">${c.status}</span>
+      </div>
+    `).join('');
+  } catch(e) {}
+}
+
+async function pollCalendar() {
+  try {
+    const res = await fetch('/api/content-calendar?site=site-a');
+    const data = await res.json();
+    const el = document.getElementById('content-calendar');
+    if (!data.length) { el.innerHTML = '<div class="empty-state">Calendar empty.</div>'; return; }
+    el.innerHTML = data.map(c => `
+      <div class="run-entry">
+        <span class="run-topic">${c.keyword}</span>
+        <span class="run-jobs">${c.planned_date || 'unscheduled'} · ${c.priority}</span>
+        <span class="run-status ${c.status}">${c.status}</span>
+      </div>
+    `).join('');
+  } catch(e) {}
+}
+
+async function pollLearnings() {
+  try {
+    const agent = document.getElementById('learning-filter')?.value || '';
+    const res = await fetch('/api/learnings' + (agent ? '?agent=' + agent : ''));
+    const data = await res.json();
+    const el = document.getElementById('learnings-list');
+    if (!data.length) { el.innerHTML = '<div class="empty-state">No learnings yet.</div>'; return; }
+    el.innerHTML = data.slice(0, 20).map(l => `
+      <div class="log-entry">
+        <span class="log-agent">${l.agent_name}</span>
+        <span class="run-status ${l.learning_type === 'compliance_flag' ? 'failed' : l.learning_type === 'founder_feedback' ? 'completed' : ''}" style="font-size:0.6rem">${l.learning_type}</span>
+        <span class="log-message">${l.description.substring(0, 80)}</span>
+      </div>
+    `).join('');
+  } catch(e) {}
+}
+
 // Queue & Schedules
 async function pollQueue() {
   try {
@@ -911,18 +989,54 @@ async function sendThreadReply(threadId) {
   input.focus();
 }
 
+let threadMessageCounts = {};
+
 function renderThreads() {
   const bar = document.getElementById('messenger-bar');
-  bar.innerHTML = '';
+
   for (const [id, state] of Object.entries(openThreads)) {
     const thread = cachedThreads.find(t => t.id === id);
-    if (thread) bar.innerHTML += renderThreadBubble(thread);
+    if (!thread) continue;
+
+    const msgCount = thread.messages?.length || 0;
+    const prevCount = threadMessageCounts[id] || 0;
+    const existing = document.getElementById(`thread-${id}`);
+
+    if (!existing) {
+      // New bubble — render it
+      bar.insertAdjacentHTML('beforeend', renderThreadBubble(thread));
+      threadMessageCounts[id] = msgCount;
+      const body = document.getElementById(`thread-body-${id}`);
+      if (body) body.scrollTop = body.scrollHeight;
+    } else if (msgCount > prevCount) {
+      // New messages — append only the new ones to the body
+      const body = document.getElementById(`thread-body-${id}`);
+      if (body) {
+        const newMsgs = thread.messages.slice(prevCount);
+        newMsgs.forEach(m => {
+          const isFounder = m.is_founder;
+          body.insertAdjacentHTML('beforeend', `
+            <div class="thread-msg ${isFounder ? 'founder' : ''}">
+              <span class="thread-msg-avatar">${m.emoji || '👤'}</span>
+              <div class="thread-msg-content">
+                <div class="thread-msg-name">${m.name} · ${m.time || ''}</div>
+                ${m.text}
+              </div>
+            </div>
+          `);
+        });
+        body.scrollTop = body.scrollHeight;
+      }
+      threadMessageCounts[id] = msgCount;
+    }
+    // Otherwise — no changes, don't touch the DOM
   }
-  // Scroll thread bodies to bottom
-  for (const id of Object.keys(openThreads)) {
-    const body = document.getElementById(`thread-body-${id}`);
-    if (body) body.scrollTop = body.scrollHeight;
-  }
+
+  // Remove closed threads from DOM
+  bar.querySelectorAll('.thread-bubble').forEach(el => {
+    const id = el.id.replace('thread-', '');
+    if (!openThreads[id]) el.remove();
+  });
 }
 
 let cachedThreads = [];
@@ -930,18 +1044,38 @@ let cachedThreads = [];
 async function pollThreads() {
   try {
     const res = await fetch('/api/threads');
-    cachedThreads = await res.json();
+    const activeThreads = await res.json();
+
+    // Merge active threads into cache (don't remove resolved ones we're still showing)
+    activeThreads.forEach(t => {
+      const idx = cachedThreads.findIndex(c => c.id === t.id);
+      if (idx >= 0) cachedThreads[idx] = t;
+      else cachedThreads.push(t);
+    });
+
     // Auto-open new threads
-    cachedThreads.forEach(t => {
+    activeThreads.forEach(t => {
       if (!knownThreadIds.has(t.id)) {
         knownThreadIds.add(t.id);
         openThreads[t.id] = { minimized: false };
       }
-      // Update existing open threads
-      if (openThreads[t.id]) {
-        // re-render to show new messages
-      }
     });
+
+    // Refresh data for any open threads (including resolved ones still open)
+    for (const id of Object.keys(openThreads)) {
+      if (!cachedThreads.find(t => t.id === id)) {
+        try {
+          const r = await fetch(`/api/threads/${id}`);
+          if (r.ok) {
+            const thread = await r.json();
+            const idx = cachedThreads.findIndex(c => c.id === id);
+            if (idx >= 0) cachedThreads[idx] = thread;
+            else cachedThreads.push(thread);
+          }
+        } catch (e) {}
+      }
+    }
+
     renderThreads();
   } catch (e) {}
 }
@@ -957,6 +1091,12 @@ setInterval(pollQueue, 3000);
 setInterval(pollSchedules, 10000);
 pollQueue();
 pollSchedules();
+pollContentRegister();
+pollCalendar();
+pollLearnings();
+setInterval(pollContentRegister, 5000);
+setInterval(pollCalendar, 5000);
+setInterval(pollLearnings, 10000);
 </script>
 </body>
 </html>

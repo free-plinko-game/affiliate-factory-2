@@ -8,6 +8,7 @@ from pathlib import Path
 from openai import OpenAI
 
 from config import load_knowledge
+import agent_session as session
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +96,7 @@ def agent_says(thread_id: str, agent_key: str, auto=True) -> str:
     name = agent.get("name", agent_key)
     kb = load_knowledge(agent_key)
 
-    # Build the conversation context
+    # Build the conversation context with full session history
     other_names = [AGENTS[p]["name"] for p in thread["participants"] if p != agent_key]
     system = f"""{PERSONALITIES.get(agent_key, '')}
 
@@ -108,9 +109,13 @@ Your knowledge base: {kb if kb else '(empty)'}
 Keep messages SHORT — 1-2 sentences. This is a quick work chat, not an essay.
 Be natural, have opinions, reference specifics from the context.
 If you think you need the founder's input, say "I think we need the boss on this" or "@founder".
-If you agree with a resolution, say so clearly."""
+If you agree with a resolution, say so clearly.
+If you've already discussed and resolved a similar issue earlier, reference that."""
 
     messages = [{"role": "system", "content": system}]
+    # Include session history so agent remembers reviews + previous discussions
+    messages.extend(session.get_messages_for_llm(agent_key, limit=20))
+    # Then the current thread messages
     for m in thread["messages"][-15:]:
         if m["agent"] == agent_key:
             messages.append({"role": "assistant", "content": m["text"]})
@@ -145,6 +150,11 @@ If you agree with a resolution, say so clearly."""
         thread["needs_founder"] = True
 
     _save_thread(thread)
+
+    # Also log to agent's persistent session
+    other_names = [AGENTS[p]["name"] for p in thread["participants"] if p != agent_key]
+    session.add_event(agent_key, "assistant", f"[Chat with {', '.join(other_names)}] {text}", "agent_chat")
+
     logger.info("[%s] %s: %s", thread_id, name, text[:80])
     return text
 
@@ -166,6 +176,41 @@ def founder_says(thread_id: str, message: str):
     thread["messages"].append(msg)
     thread["needs_founder"] = False
     _save_thread(thread)
+
+    # Broadcast to ALL agent sessions — everyone hears the founder in real time
+    topic = thread.get("topic", "a discussion")
+    all_agents = list(AGENTS.keys())
+    for agent_key in all_agents:
+        session.add_event(agent_key, "system",
+                          f"[Founder in group chat \"{topic}\"] Boss said: \"{message}\"",
+                          "broadcast")
+
+    # Extract actionable feedback and save to participant KBs
+    try:
+        from config import load_knowledge, save_knowledge
+        client = OpenAI()
+        kb_extract = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": (
+                    "Extract actionable preferences from the founder's message to their team. "
+                    "If there's feedback an employee should remember, return it as a concise bullet point. "
+                    "If nothing actionable, return: NONE"
+                )},
+                {"role": "user", "content": f"Founder said in a group chat about \"{topic}\": {message}"},
+            ],
+            temperature=0.0, max_tokens=100,
+        )
+        extracted = kb_extract.choices[0].message.content.strip()
+        if extracted and extracted.upper() != "NONE":
+            item = extracted.lstrip("-•* ").strip()
+            for p in thread.get("participants", []):
+                if p in AGENTS:
+                    current_kb = load_knowledge(p)
+                    save_knowledge(p, current_kb.rstrip() + f"\n- {item}\n")
+            logger.info("KB updated for participants: %s", item)
+    except Exception as e:
+        logger.debug("KB extraction failed (non-fatal): %s", e)
 
 
 def resolve_thread(thread_id: str):

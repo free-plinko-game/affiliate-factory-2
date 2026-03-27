@@ -4,6 +4,10 @@ import logging
 import time
 import sys
 
+import sys
+sys.path.insert(0, str(__import__('pathlib').Path(__file__).parent.parent / "db"))
+import state
+
 import job_queue
 import seo_agent
 import writer_agent
@@ -46,6 +50,13 @@ def process_job(job: dict) -> dict:
         brief = seo_agent.run(topic, site_config)
         kw = brief.get("target_keyword", topic)
         db.log_step(run_id, "seo_agent", "seo_brief", "done", brief)
+
+        # Register content in state foundation
+        site_slug = site_config.get("site_slug", "site-a")
+        content_type = job.get("content_type", "guide")
+        register_id = state.register_content(site_slug, kw, content_type, "briefed", run_id=run_id)
+        calendar_id = state.add_to_calendar(site_slug, kw, content_type, job_id=job_id)
+
         dash.update(agent="seo_agent", status="success",
                     speech=f"Brief done! \"{kw}\"",
                     log=f"Brief → \"{kw}\"",
@@ -59,6 +70,9 @@ def process_job(job: dict) -> dict:
         draft = writer_agent.run(brief, site_config)
         wc = len(draft.split())
         db.log_step(run_id, "writer_agent", "first_draft", "done", {"word_count": wc})
+        state.update_content_status(register_id, "drafted", word_count=wc)
+        state.update_calendar_status(calendar_id, "in_review", assigned_to="emma")
+
         dash.update(agent="writer_agent", status="success",
                     speech=f"Draft done! {wc} words.",
                     log=f"Draft: {wc} words",
@@ -85,6 +99,9 @@ def process_job(job: dict) -> dict:
                 dash.update(agent="compliance_agent", status="error",
                             speech=f"{len(comp_result.get('issues', []))} compliance issue(s).",
                             thought=f"[{kw}] Failed:\n" + "\n".join(f"• {i}" for i in comp_result.get("issues", [])))
+                for issue in comp_result.get("issues", []):
+                    state.log_learning("clara", "compliance_flag", issue,
+                                       site_slug=site_slug, source=str(run_id))
 
             # Editorial
             dash.update(agent="editor_agent", status="working",
@@ -101,6 +118,9 @@ def process_job(job: dict) -> dict:
                 dash.update(agent="editor_agent", status="error",
                             speech=f"{len(edit_result.get('issues', []))} editorial issue(s).",
                             thought=f"[{kw}] Issues:\n" + "\n".join(f"• {i}" for i in edit_result.get("issues", [])))
+                for issue in edit_result.get("issues", []):
+                    state.log_learning("emma", "editorial_issue", issue,
+                                       site_slug=site_slug, source=str(run_id))
 
             if comp_result.get("compliance_pass") and edit_result.get("editorial_pass"):
                 passed = True
@@ -144,10 +164,25 @@ def process_job(job: dict) -> dict:
             else:
                 job_queue.finish_job(job_id, "review_failed", error="Review failed after discussion")
                 db.finish_run(run_id, "failed")
+
+                # Open group chat with all agents for founder to review
+                all_issues = comp_result.get("issues", []) + edit_result.get("issues", [])
+                issues_text = "\n".join(f"- {i}" for i in all_issues)
+                group_thread = agent_chat.create_thread(
+                    ["manager_agent", "editor_agent", "compliance_agent", "sub_editor_agent", "writer_agent"],
+                    f"Failed: {kw}",
+                    f"Article \"{kw}\" failed review after {MAX_REVISIONS} attempts.\n\nRemaining issues:\n{issues_text}\n\nThe founder can give feedback here and ask Max to retry."
+                )
+                # Max kicks off the discussion
+                agent_chat.agent_says(group_thread, "manager_agent")
+                # Emma and Clara chime in
+                agent_chat.agent_says(group_thread, "editor_agent")
+                agent_chat.agent_says(group_thread, "compliance_agent")
+
                 dash.update(agent="manager_agent", status="error",
-                            speech=f"\"{kw}\" failed. Needs founder.",
-                            log=f"FAILED: {kw}")
-                return {"status": "review_failed", "job_id": job_id}
+                            speech=f"\"{kw}\" failed. Group chat open — check in!",
+                            log=f"FAILED: {kw} — group chat opened")
+                return {"status": "review_failed", "job_id": job_id, "thread_id": group_thread}
 
         # Publish
         dash.update(agent="publisher_agent", status="working",
@@ -158,6 +193,13 @@ def process_job(job: dict) -> dict:
         dash.update(agent="publisher_agent", status="success",
                     speech=f"PR opened for \"{kw}\"!",
                     log=f"PR → {pr_url}")
+
+        # Update state foundation
+        state.update_content_status(register_id, "published", pr_url=pr_url,
+                                     compliance_pass=1, word_count=len(draft.split()),
+                                     slug=brief.get("target_keyword", "").replace(" ", "-").lower())
+        state.update_calendar_status(calendar_id, "published",
+                                      content_register_id=register_id)
 
         job_queue.finish_job(job_id, "published", pr_url=pr_url, run_id=run_id)
         db.finish_run(run_id, "completed", pr_url=pr_url)

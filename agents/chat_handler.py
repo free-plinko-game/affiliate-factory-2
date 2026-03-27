@@ -8,6 +8,7 @@ from pathlib import Path
 from openai import OpenAI
 
 from config import load_knowledge, save_knowledge
+import agent_session as session
 
 logger = logging.getLogger(__name__)
 
@@ -188,11 +189,24 @@ Your preferences and feedback from the founder are tracked automatically — jus
         knowledge_updated = True
         logger.info("KB updated for %s: %s", agent_key, item)
 
-    # Save to history
+    # Save to chat history (for dashboard UI)
     now = datetime.now(timezone.utc).strftime("%H:%M")
     history.append({"role": "user", "content": message, "time": now})
     history.append({"role": "assistant", "content": clean_reply, "time": now,
                     "kb_updated": knowledge_updated})
+
+    # Save to this agent's session
+    session.add_event(agent_key, "user", f"[Founder] {message}", "founder_chat")
+    session.add_event(agent_key, "assistant", f"[To founder] {clean_reply}", "founder_chat")
+
+    # Broadcast to ALL other agent sessions so everyone hears founder feedback in real time
+    all_agents = ["manager_agent", "seo_agent", "writer_agent", "editor_agent",
+                  "sub_editor_agent", "compliance_agent", "publisher_agent"]
+    for other in all_agents:
+        if other != agent_key:
+            session.add_event(other, "system",
+                              f"[Office announcement] Founder told {name}: \"{message}\"",
+                              "broadcast")
 
     # Keep history manageable
     if len(history) > 100:
